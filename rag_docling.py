@@ -364,6 +364,7 @@ def build_ui():
         with gr.Row():
             with gr.Column(scale=2):
                 chat = gr.Chatbot(
+                    type='messages',
                     height=500,
                     label="Chat",
                     show_copy_button=True
@@ -412,5 +413,5 @@ def build_ui():
 
 if __name__ == "__main__":
     app = build_ui()
-    app.launch
+    app.launch()
 
