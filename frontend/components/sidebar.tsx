@@ -4,7 +4,7 @@ import { useState, Suspense, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Plus, MessageSquare, X, ChevronLeft, ChevronRight } from "lucide-react"
+import { Plus, MessageSquare, X, Home } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useChatSessions } from "@/lib/hooks/useChatSessions"
@@ -148,22 +148,40 @@ function SidebarContent() {
 
       {/* Toggle Pin Button */}
       <div className="px-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleTogglePin}
-          className={cn(
-            "w-10 h-10 rounded-full hover:bg-gray-200 flex-shrink-0 transition-all duration-300",
-            isPinned && "bg-gray-200"
-          )}
-          title={isPinned ? "Unpin sidebar" : "Pin sidebar"}
-        >
-          {isPinned ? (
-            <ChevronLeft className="h-5 w-5 text-gray-700" />
-          ) : (
-            <ChevronRight className="h-5 w-5 text-gray-700" />
-          )}
-        </Button>
+        <div className="relative">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleTogglePin}
+            className={cn(
+              "w-10 h-10 rounded-full hover:bg-gray-200 flex-shrink-0 transition-all duration-300 group",
+              isPinned && "bg-gray-200"
+            )}
+          >
+            {/* Custom Sidebar Toggle Icon */}
+            <svg
+              className="h-5 w-5 text-gray-700"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {/* Rounded rectangle outline */}
+              <rect x="3" y="5" width="18" height="14" rx="2" ry="2" />
+              {/* Vertical divider line */}
+              <line x1="9" y1="5" x2="9" y2="19" />
+              {/* Two horizontal lines in left section */}
+              <line x1="5" y1="9" x2="8" y2="9" />
+              <line x1="5" y1="15" x2="8" y2="15" />
+            </svg>
+          </Button>
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+            Toggle Sidebar
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+          </div>
+        </div>
       </div>
 
       {/* New Chat Button */}
@@ -248,6 +266,35 @@ function SidebarContent() {
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Home Icon */}
+      <div className="px-2">
+        <Link href="/">
+          <Button
+            variant="ghost"
+            className={cn(
+              "rounded-full hover:bg-gray-200 flex-shrink-0 transition-all duration-300",
+              pathname === "/" && "bg-gray-200",
+              isExpanded ? "w-full justify-start gap-3 px-4 py-2.5" : "w-10 h-10 justify-center"
+            )}
+          >
+            <Home className="h-5 w-5 text-gray-700 flex-shrink-0" />
+            <AnimatePresence>
+              {isExpanded && (
+                <motion.span
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: "auto" }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="whitespace-nowrap text-gray-700"
+                >
+                  Home
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </Button>
+        </Link>
+      </div>
 
       {/* Resize Handle */}
       {isExpanded && (

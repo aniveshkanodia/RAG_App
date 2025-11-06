@@ -100,14 +100,19 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   return (
     <div className="flex-1 flex flex-col bg-gray-50 rounded-r-2xl overflow-hidden">
       {/* Message List Area */}
-      <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="max-w-4xl mx-auto">
-          {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-gray-400">
-              <p className="text-lg">No messages yet. Start a conversation!</p>
-            </div>
-          ) : (
-            <div className="space-y-4 py-4">
+      {messages.length === 0 ? (
+        // Empty state: No scrollable container, just centered welcome message (matches home page)
+        <div className="flex-1 flex flex-col items-center justify-center px-8 pb-24">
+          <div className="w-full max-w-4xl mb-12">
+            <h1 className="text-6xl font-bold text-blue-500 mb-2">Hello</h1>
+            <p className="text-xl text-gray-600">I'm here to help you find answers and insights from your documents.</p>
+          </div>
+        </div>
+      ) : (
+        // Active chat: Scrollable container only appears when user starts chatting
+        <div className="flex-1 overflow-y-auto px-8">
+          <div className="max-w-4xl mx-auto py-6">
+            <div className="space-y-4">
               {messages.map((message) => (
                 <div
                   key={message.id}
@@ -123,9 +128,9 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
                 </div>
               ))}
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Chat Input Area at Bottom */}
       <div className="px-8 pb-8">
