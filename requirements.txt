@@ -9,3 +9,6 @@ gradio
 chromadb
 pypdf
 unstructured[docx]
+fastapi
+uvicorn[standard]
+python-multipart
