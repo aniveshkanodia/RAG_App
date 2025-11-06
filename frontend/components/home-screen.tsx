@@ -33,7 +33,7 @@ export function HomeScreen() {
       </div>
 
       {/* Chat Input Area at Bottom */}
-      <div className="px-8 pb-8">
+      <div className="px-8 pb-4">
         <div className="max-w-4xl mx-auto">
           <div className="relative flex items-center gap-2 bg-gray-100 rounded-xl px-4 py-3 shadow-sm">
             {/* Hidden File Input */}
@@ -84,6 +84,15 @@ export function HomeScreen() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Copyright Notice */}
+      <div className="px-8 pb-4">
+        <div className="max-w-4xl mx-auto">
+          <p className="text-xs text-gray-500 text-center">
+            © 2025 Anivesh Kanodia. All rights reserved.
+          </p>
         </div>
       </div>
     </div>
