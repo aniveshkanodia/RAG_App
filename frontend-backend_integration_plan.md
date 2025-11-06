@@ -30,7 +30,43 @@ Transform the Gradio-based backend into a REST API using FastAPI, and connect th
 
 ### Phase 2: Chat Feature (Backend)
 
-4.**Step 4**: Implement chat endpoint (`POST /api/chat`) that accepts questions and returns answers using `run_pipeline()` from `rag_docling.py`
+**Backend File Organization (Simpler Structure):**
+
+When implementing Phase 2, organize backend files using a simpler structure:
+
+```text
+RAG_App/
+├── api_server.py               # FastAPI app with routes
+├── backend/                    # Backend logic (NEW)
+│   ├── __init__.py
+│   ├── rag.py                  # RAG pipeline (extracted from rag_docling.py)
+│   │   - init_rag()
+│   │   - run_pipeline()
+│   │   - answer_question()
+│   │
+│   └── document_processor.py   # Document processing (extracted from rag_docling.py)
+│       - load_document()
+│       - process_documents_for_chunking()
+│       - process_and_index_file()
+│
+├── rag_docling.py              # Keep as reference, gradually migrate
+├── requirements.txt
+└── db/                          # Database (existing)
+```
+
+**Migration Steps for Phase 2:**
+
+1. Create `backend/` directory with `__init__.py`
+2. Extract RAG functions from `rag_docling.py` to `backend/rag.py`:
+   - `init_rag()`
+   - `run_pipeline()`
+   - `answer_question()`
+3. Import in `api_server.py`: `from backend.rag import run_pipeline, answer_question`
+4. Keep `rag_docling.py` as reference during migration
+
+**Note:** Document processing functions will be extracted to `backend/document_processor.py` in Phase 4.
+
+4.**Step 4**: Implement chat endpoint (`POST /api/chat`) that accepts questions and returns answers using `run_pipeline()` from `backend/rag.py`
 5.**Step 5**: Test chat endpoint independently with curl/Postman to verify backend works
 
 **Test Cases for Phase 2:**
@@ -186,7 +222,7 @@ Transform the Gradio-based backend into a REST API using FastAPI, and connect th
 
 1. User selects file in frontend
 2. Frontend sends file as FormData to `/api/upload`
-3. Backend saves file temporarily, processes with `process_and_index_file()`
+3. Backend saves file temporarily, processes with `process_and_index_file()` from `backend/document_processor.py`
 4. Backend returns success/error message
 5. Frontend displays status to user
 
@@ -194,7 +230,7 @@ Transform the Gradio-based backend into a REST API using FastAPI, and connect th
 
 1. User submits question in frontend
 2. Frontend sends POST to `/api/chat` with question
-3. Backend calls `run_pipeline()` from `rag_docling.py`
+3. Backend calls `run_pipeline()` from `backend/rag.py`
 4. Backend returns answer and sources
 5. Frontend displays response in chat window
 
@@ -203,13 +239,13 @@ Transform the Gradio-based backend into a REST API using FastAPI, and connect th
 - [ ] Step 1: Create basic FastAPI server structure (api_server.py) with CORS configuration for port 8000
 - [ ] Step 2: Add health check endpoint (GET /api/health) to verify server is running
 - [ ] Step 3: Update requirements.txt with fastapi, uvicorn, and python-multipart dependencies
-- [ ] Step 4: Implement chat endpoint (POST /api/chat) that accepts questions and returns answers using run_pipeline()
+- [ ] Step 4: Implement chat endpoint (POST /api/chat) that accepts questions and returns answers using run_pipeline() from backend/rag.py
 - [ ] Step 5: Test chat endpoint independently with curl/Postman to verify backend works
 - [ ] Step 6: Create API client utility (frontend/lib/api/client.ts) with base URL configuration
 - [ ] Step 7: Implement chat() function in API client to call POST /api/chat
 - [ ] Step 8: Update chat-window.tsx handleSend() to call chat API instead of placeholder
 - [ ] Step 9: Add loading states and error handling to chat window for better UX
-- [ ] Step 10: Implement file upload endpoint (POST /api/upload) that processes files using process_and_index_file()
+- [ ] Step 10: Implement file upload endpoint (POST /api/upload) that processes files using process_and_index_file() from backend/document_processor.py
 - [ ] Step 11: Test file upload endpoint independently to verify backend works
 - [ ] Step 12: Implement uploadFile() function in API client to call POST /api/upload with FormData
 - [ ] Step 13: Update file upload handler in chat-window.tsx to call upload API
