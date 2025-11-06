@@ -1,16 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Plus, Home, RotateCw } from "lucide-react"
+import { Plus, Home, RotateCw, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { useChatSessions } from "@/lib/hooks/useChatSessions"
 
-export function Sidebar() {
+function SidebarContent() {
   const pathname = usePathname()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [isExpanded, setIsExpanded] = useState(false)
+  const { sessions, createNewChat, refreshSessions } = useChatSessions()
+  const currentChatId = searchParams.get("chatId")
 
   return (
     <motion.div
@@ -33,34 +38,66 @@ export function Sidebar() {
 
       {/* New Chat Button */}
       <div className="px-2">
-        <Link href="/">
-          <Button
-            className={cn(
-              "rounded-xl bg-blue-500 hover:bg-blue-600 text-white flex-shrink-0 transition-all duration-300",
-              pathname === "/" && "bg-blue-600",
-              isExpanded ? "w-full justify-start gap-3 px-4 py-3" : "w-12 h-12 justify-center"
+        <Button
+          onClick={() => {
+            const newChat = createNewChat()
+            router.push(`/chat?chatId=${newChat.id}`)
+          }}
+          className={cn(
+            "rounded-xl bg-blue-500 hover:bg-blue-600 text-white flex-shrink-0 transition-all duration-300",
+            pathname === "/" && "bg-blue-600",
+            isExpanded ? "w-full justify-start gap-3 px-4 py-3" : "w-12 h-12 justify-center"
+          )}
+        >
+          <Plus className="h-5 w-5 flex-shrink-0" />
+          <AnimatePresence>
+            {isExpanded && (
+              <motion.span
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                exit={{ opacity: 0, width: 0 }}
+                transition={{ duration: 0.2 }}
+                className="whitespace-nowrap font-medium"
+              >
+                New Chat
+              </motion.span>
             )}
-          >
-            <Plus className="h-5 w-5 flex-shrink-0" />
-            <AnimatePresence>
-              {isExpanded && (
-                <motion.span
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: "auto" }}
-                  exit={{ opacity: 0, width: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="whitespace-nowrap font-medium"
-                >
-                  New Chat
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </Button>
-        </Link>
+          </AnimatePresence>
+        </Button>
       </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      {/* Chat History List */}
+      {isExpanded && sessions.length > 0 && (
+        <div className="flex-1 overflow-y-auto px-2 mt-2 space-y-1 min-h-0">
+          {sessions.slice(0, 10).map((session) => (
+            <Link key={session.id} href={`/chat?chatId=${session.id}`}>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start gap-3 px-3 py-2 h-auto rounded-lg hover:bg-gray-200 text-left",
+                  currentChatId === session.id && "bg-gray-200"
+                )}
+              >
+                <MessageSquare className="h-4 w-4 text-gray-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-700 truncate">
+                    {session.title}
+                  </p>
+                  {session.messages.length > 0 && (
+                    <p className="text-xs text-gray-500 truncate mt-0.5">
+                      {session.messages[session.messages.length - 1]?.content.substring(0, 30)}
+                      {session.messages[session.messages.length - 1]?.content.length > 30 && "..."}
+                    </p>
+                  )}
+                </div>
+              </Button>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* Spacer - only show if no chat history */}
+      {(!isExpanded || sessions.length === 0) && <div className="flex-1" />}
 
       {/* Home Icon */}
       <div className="px-2">
@@ -95,6 +132,7 @@ export function Sidebar() {
       <div className="px-2">
         <Button
           variant="ghost"
+          onClick={refreshSessions}
           className={cn(
             "rounded-full hover:bg-gray-200 flex-shrink-0 transition-all duration-300",
             isExpanded ? "w-full justify-start gap-3 px-4 py-2.5" : "w-10 h-10 justify-center"
@@ -117,6 +155,23 @@ export function Sidebar() {
         </Button>
       </div>
     </motion.div>
+  )
+}
+
+export function Sidebar() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen w-16 bg-gray-100 rounded-l-2xl flex flex-col items-center py-4 gap-4">
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500 via-red-400 to-blue-500 flex items-center justify-center flex-shrink-0">
+          <div className="w-6 h-6 relative">
+            <div className="absolute inset-0 border-2 border-white rounded-full"></div>
+            <div className="absolute inset-0 border-2 border-transparent border-t-white border-r-white rotate-45 rounded-full"></div>
+          </div>
+        </div>
+      </div>
+    }>
+      <SidebarContent />
+    </Suspense>
   )
 }
 
