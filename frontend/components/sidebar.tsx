@@ -4,7 +4,7 @@ import { useState, Suspense } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Plus, Home, RotateCw, MessageSquare } from "lucide-react"
+import { Plus, Home, RotateCw, MessageSquare, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useChatSessions } from "@/lib/hooks/useChatSessions"
@@ -14,8 +14,22 @@ function SidebarContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isExpanded, setIsExpanded] = useState(false)
-  const { sessions, createNewChat, refreshSessions } = useChatSessions()
+  const { sessions, createNewChat, refreshSessions, deleteChat } = useChatSessions()
   const currentChatId = searchParams.get("chatId")
+  const [hoveredChatId, setHoveredChatId] = useState<string | null>(null)
+
+  const handleDeleteChat = (e: React.MouseEvent, chatId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Delete the chat
+    deleteChat(chatId)
+    
+    // If the deleted chat is the current one, navigate to home
+    if (currentChatId === chatId) {
+      router.push("/")
+    }
+  }
 
   return (
     <motion.div
@@ -70,28 +84,48 @@ function SidebarContent() {
       {isExpanded && sessions.length > 0 && (
         <div className="flex-1 overflow-y-auto px-2 mt-2 space-y-1 min-h-0">
           {sessions.slice(0, 10).map((session) => (
-            <Link key={session.id} href={`/chat?chatId=${session.id}`}>
+            <div
+              key={session.id}
+              className="relative group"
+              onMouseEnter={() => setHoveredChatId(session.id)}
+              onMouseLeave={() => setHoveredChatId(null)}
+            >
+              <Link href={`/chat?chatId=${session.id}`}>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full justify-start gap-3 px-3 py-2 h-auto rounded-lg hover:bg-gray-200 text-left pr-10",
+                    currentChatId === session.id && "bg-gray-200"
+                  )}
+                >
+                  <MessageSquare className="h-4 w-4 text-gray-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-700 truncate">
+                      {session.title}
+                    </p>
+                    {session.messages.length > 0 && (
+                      <p className="text-xs text-gray-500 truncate mt-0.5">
+                        {session.messages[session.messages.length - 1]?.content.substring(0, 30)}
+                        {session.messages[session.messages.length - 1]?.content.length > 30 && "..."}
+                      </p>
+                    )}
+                  </div>
+                </Button>
+              </Link>
+              {/* Delete Button - appears on hover */}
               <Button
                 variant="ghost"
+                size="icon"
+                onClick={(e) => handleDeleteChat(e, session.id)}
                 className={cn(
-                  "w-full justify-start gap-3 px-3 py-2 h-auto rounded-lg hover:bg-gray-200 text-left",
-                  currentChatId === session.id && "bg-gray-200"
+                  "absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full hover:bg-red-100 hover:text-red-600 transition-opacity",
+                  hoveredChatId === session.id ? "opacity-100" : "opacity-0"
                 )}
+                title="Delete chat"
               >
-                <MessageSquare className="h-4 w-4 text-gray-600 flex-shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-700 truncate">
-                    {session.title}
-                  </p>
-                  {session.messages.length > 0 && (
-                    <p className="text-xs text-gray-500 truncate mt-0.5">
-                      {session.messages[session.messages.length - 1]?.content.substring(0, 30)}
-                      {session.messages[session.messages.length - 1]?.content.length > 30 && "..."}
-                    </p>
-                  )}
-                </div>
+                <X className="h-3 w-3" />
               </Button>
-            </Link>
+            </div>
           ))}
         </div>
       )}
