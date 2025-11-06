@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState, Suspense, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Plus, Home, RotateCw, MessageSquare, Trash2, X } from "lucide-react"
+import { Plus, MessageSquare, X, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useChatSessions } from "@/lib/hooks/useChatSessions"
@@ -13,10 +13,51 @@ function SidebarContent() {
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [isExpanded, setIsExpanded] = useState(false)
-  const { sessions, createNewChat, refreshSessions, deleteChat } = useChatSessions()
+  const { sessions, createNewChat, deleteChat } = useChatSessions()
   const currentChatId = searchParams.get("chatId")
   const [hoveredChatId, setHoveredChatId] = useState<string | null>(null)
+  
+  // Sidebar state management
+  const [isPinned, setIsPinned] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sidebar_pinned")
+      return saved === "true"
+    }
+    return false
+  })
+  const [isHovered, setIsHovered] = useState(false)
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sidebar_width")
+      const width = saved ? parseInt(saved, 10) : 240
+      // Ensure saved width is at least 140px
+      return Math.max(width, 140)
+    }
+    return 240
+  })
+  const [isResizing, setIsResizing] = useState(false)
+  
+  const minWidth = 64 // Minimum width when collapsed
+  const minExpandedWidth = 140 // Minimum width when expanded/pinned
+  const maxWidth = 200
+  
+  // Determine if sidebar should be expanded
+  const isExpanded = isPinned || isHovered
+  
+  // Ensure sidebarWidth is at least minExpandedWidth when pinned
+  useEffect(() => {
+    if (isPinned && sidebarWidth < minExpandedWidth) {
+      setSidebarWidth(minExpandedWidth)
+      if (typeof window !== "undefined") {
+        localStorage.setItem("sidebar_width", String(minExpandedWidth))
+      }
+    }
+  }, [isPinned, sidebarWidth, minExpandedWidth])
+
+  // Get current width - ensure expanded width is at least minExpandedWidth
+  const currentWidth = isExpanded 
+    ? Math.max(sidebarWidth, minExpandedWidth) 
+    : minWidth
 
   const handleDeleteChat = (e: React.MouseEvent, chatId: string) => {
     e.preventDefault()
@@ -31,14 +72,69 @@ function SidebarContent() {
     }
   }
 
+  // Toggle pin state
+  const handleTogglePin = () => {
+    const newPinnedState = !isPinned
+    setIsPinned(newPinnedState)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sidebar_pinned", String(newPinnedState))
+    }
+  }
+
+  // Handle resize start
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsResizing(true)
+  }
+
+  // Handle resize
+  useEffect(() => {
+    if (!isResizing) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // Calculate width based on mouse X position (sidebar starts at 0)
+      // Use minExpandedWidth when resizing (since sidebar must be expanded to resize)
+      const newWidth = Math.min(Math.max(e.clientX, minExpandedWidth), maxWidth)
+      setSidebarWidth(newWidth)
+      if (typeof window !== "undefined") {
+        localStorage.setItem("sidebar_width", String(newWidth))
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    // Prevent text selection while resizing
+    const handleSelectStart = (e: Event) => {
+      e.preventDefault()
+    }
+
+    document.addEventListener("mousemove", handleMouseMove)
+    document.addEventListener("mouseup", handleMouseUp)
+    document.addEventListener("selectstart", handleSelectStart)
+    document.body.style.cursor = "col-resize"
+    document.body.style.userSelect = "none"
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove)
+      document.removeEventListener("mouseup", handleMouseUp)
+      document.removeEventListener("selectstart", handleSelectStart)
+      document.body.style.cursor = ""
+      document.body.style.userSelect = ""
+    }
+  }, [isResizing, minExpandedWidth, maxWidth])
+
   return (
     <motion.div
-      className="h-screen bg-gray-100 rounded-l-2xl flex flex-col py-4 gap-4 overflow-hidden"
-      initial={{ width: 64 }}
-      animate={{ width: isExpanded ? 240 : 64 }}
+      className="h-screen bg-gray-100 rounded-l-2xl flex flex-col py-4 gap-4 overflow-hidden relative"
+      initial={{ width: minWidth }}
+      animate={{ width: currentWidth }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
-      onMouseEnter={() => setIsExpanded(true)}
-      onMouseLeave={() => setIsExpanded(false)}
+      onMouseEnter={() => !isPinned && setIsHovered(true)}
+      onMouseLeave={() => !isPinned && setIsHovered(false)}
+      style={{ cursor: isResizing ? "col-resize" : "default" }}
     >
       {/* App Icon - Red/Blue Pinwheel Design */}
       <div className="flex items-center justify-center px-2">
@@ -48,6 +144,26 @@ function SidebarContent() {
             <div className="absolute inset-0 border-2 border-transparent border-t-white border-r-white rotate-45 rounded-full"></div>
           </div>
         </div>
+      </div>
+
+      {/* Toggle Pin Button */}
+      <div className="px-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleTogglePin}
+          className={cn(
+            "w-10 h-10 rounded-full hover:bg-gray-200 flex-shrink-0 transition-all duration-300",
+            isPinned && "bg-gray-200"
+          )}
+          title={isPinned ? "Unpin sidebar" : "Pin sidebar"}
+        >
+          {isPinned ? (
+            <ChevronLeft className="h-5 w-5 text-gray-700" />
+          ) : (
+            <ChevronRight className="h-5 w-5 text-gray-700" />
+          )}
+        </Button>
       </div>
 
       {/* New Chat Button */}
@@ -130,64 +246,19 @@ function SidebarContent() {
         </div>
       )}
 
-      {/* Spacer - only show if no chat history */}
-      {(!isExpanded || sessions.length === 0) && <div className="flex-1" />}
+      {/* Spacer */}
+      <div className="flex-1" />
 
-      {/* Home Icon */}
-      <div className="px-2">
-        <Link href="/">
-          <Button
-            variant="ghost"
-            className={cn(
-              "rounded-full hover:bg-gray-200 flex-shrink-0 transition-all duration-300",
-              (pathname === "/" || pathname === "/chat") && "bg-gray-200",
-              isExpanded ? "w-full justify-start gap-3 px-4 py-2.5" : "w-10 h-10 justify-center"
-            )}
-          >
-            <Home className="h-5 w-5 text-gray-700 flex-shrink-0" />
-            <AnimatePresence>
-              {isExpanded && (
-                <motion.span
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: "auto" }}
-                  exit={{ opacity: 0, width: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="whitespace-nowrap text-gray-700"
-                >
-                  Home
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </Button>
-        </Link>
-      </div>
-
-      {/* Refresh Icon */}
-      <div className="px-2">
-        <Button
-          variant="ghost"
-          onClick={refreshSessions}
-          className={cn(
-            "rounded-full hover:bg-gray-200 flex-shrink-0 transition-all duration-300",
-            isExpanded ? "w-full justify-start gap-3 px-4 py-2.5" : "w-10 h-10 justify-center"
-          )}
+      {/* Resize Handle */}
+      {isExpanded && (
+        <div
+          className="absolute right-0 top-0 bottom-0 w-1 bg-transparent hover:bg-blue-400 cursor-col-resize transition-colors z-10"
+          onMouseDown={handleResizeStart}
+          style={{ cursor: "col-resize" }}
         >
-          <RotateCw className="h-5 w-5 text-gray-700 flex-shrink-0" />
-          <AnimatePresence>
-            {isExpanded && (
-              <motion.span
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: "auto" }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.2 }}
-                className="whitespace-nowrap text-gray-700"
-              >
-                Refresh
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </Button>
-      </div>
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-1 h-12 bg-gray-400 rounded-full opacity-0 hover:opacity-100 transition-opacity" />
+        </div>
+      )}
     </motion.div>
   )
 }
