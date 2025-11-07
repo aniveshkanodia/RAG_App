@@ -22,6 +22,15 @@ export interface ChatError {
   detail: string;
 }
 
+export interface UploadResponse {
+  message: string;
+  chunks?: number;
+}
+
+export interface UploadError {
+  detail: string;
+}
+
 /**
  * Checks if the backend server is available.
  * 
@@ -75,6 +84,63 @@ export async function chat(question: string): Promise<ChatResponse> {
     }
 
     const data: ChatResponse = await response.json();
+    return data;
+  } catch (error) {
+    // Handle network errors or other exceptions
+    if (error instanceof Error) {
+      // Check if it's a network error (fetch API throws "Failed to fetch" for network errors)
+      if (error.message === "Failed to fetch" || error.message.includes("fetch")) {
+        throw new Error("We're having trouble reaching the server — please try again later.");
+      }
+      throw error;
+    }
+    throw new Error("We're having trouble reaching the server — please try again later.");
+  }
+}
+
+/**
+ * Uploads a file to the backend for processing and indexing.
+ * 
+ * @param file - The file to upload
+ * @returns Promise resolving to the upload response with message and chunk count
+ * @throws Error if the request fails
+ */
+export async function uploadFile(file: File): Promise<UploadResponse> {
+  if (!file) {
+    throw new Error("No file provided");
+  }
+
+  // Validate file type
+  const fileExt = file.name.split('.').pop()?.toLowerCase();
+  const supportedExtensions = ['pdf', 'txt', 'docx', 'doc'];
+  
+  if (!fileExt || !supportedExtensions.includes(fileExt)) {
+    throw new Error(`Unsupported file type: .${fileExt}. Supported types: ${supportedExtensions.join(', ')}`);
+  }
+
+  try {
+    // Create FormData with the file
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${API_BASE_URL}/api/upload`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      // Try to parse error message from response
+      let errorMessage = `Request failed with status ${response.status}`;
+      try {
+        const errorData: UploadError = await response.json();
+        errorMessage = errorData.detail || errorMessage;
+      } catch {
+        // If parsing fails, use default message
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data: UploadResponse = await response.json();
     return data;
   } catch (error) {
     // Handle network errors or other exceptions

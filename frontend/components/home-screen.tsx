@@ -6,7 +6,7 @@ import { Plus, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useChatSessions } from "@/lib/hooks/useChatSessions"
-import { checkServerHealth } from "@/lib/api/client"
+import { checkServerHealth, uploadFile } from "@/lib/api/client"
 
 export function HomeScreen() {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -14,15 +14,52 @@ export function HomeScreen() {
   const [inputValue, setInputValue] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' })
+  const [isUploading, setIsUploading] = useState(false)
   const router = useRouter()
   const { createNewChat } = useChatSessions()
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
-      // Handle file upload here
-      console.log("File selected:", file.name)
-      // You can add your file handling logic here
+    if (!file) return
+
+    // Clear previous status
+    setUploadStatus({ type: null, message: '' })
+    setServerError(null)
+    setIsUploading(true)
+
+    try {
+      // Upload the file
+      const response = await uploadFile(file)
+      
+      // Show success message
+      setUploadStatus({
+        type: 'success',
+        message: response.message
+      })
+      
+      // Clear status after 5 seconds
+      setTimeout(() => {
+        setUploadStatus({ type: null, message: '' })
+      }, 5000)
+    } catch (error) {
+      // Show error message
+      const errorMessage = error instanceof Error ? error.message : "Failed to upload file. Please try again."
+      setUploadStatus({
+        type: 'error',
+        message: errorMessage
+      })
+      
+      // Clear status after 5 seconds
+      setTimeout(() => {
+        setUploadStatus({ type: null, message: '' })
+      }, 5000)
+    } finally {
+      setIsUploading(false)
+      // Reset file input so the same file can be uploaded again if needed
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
     }
   }
 
@@ -88,6 +125,16 @@ export function HomeScreen() {
               <p className="text-sm text-red-800">{serverError}</p>
             </div>
           )}
+          {/* Upload Status Message */}
+          {uploadStatus.type && (
+            <div className={`mb-3 p-3 rounded-lg ${
+              uploadStatus.type === 'success' 
+                ? 'bg-green-50 border border-green-200 text-green-800' 
+                : 'bg-red-50 border border-red-200 text-red-800'
+            }`}>
+              <p className="text-sm">{uploadStatus.message}</p>
+            </div>
+          )}
           <div className="relative flex items-center gap-2 bg-gray-100 rounded-xl px-4 py-3 shadow-sm">
             {/* Hidden File Input */}
             <input
@@ -105,9 +152,14 @@ export function HomeScreen() {
                 size="icon"
                 type="button"
                 onClick={handleUploadClick}
-                className="w-8 h-8 rounded-full bg-white hover:bg-gray-200"
+                disabled={isUploading}
+                className="w-8 h-8 rounded-full bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Plus className="h-4 w-4 text-gray-700" />
+                {isUploading ? (
+                  <div className="w-4 h-4 border-2 border-gray-700 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4 text-gray-700" />
+                )}
               </Button>
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
                 Upload Files
