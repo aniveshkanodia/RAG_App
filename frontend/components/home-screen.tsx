@@ -1,12 +1,21 @@
 "use client"
 
-import { useRef } from "react"
+import { useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Plus, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useChatSessions } from "@/lib/hooks/useChatSessions"
+import { checkServerHealth } from "@/lib/api/client"
 
 export function HomeScreen() {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [inputValue, setInputValue] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [serverError, setServerError] = useState<string | null>(null)
+  const router = useRouter()
+  const { createNewChat } = useChatSessions()
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -19,6 +28,44 @@ export function HomeScreen() {
 
   const handleUploadClick = () => {
     fileInputRef.current?.click()
+  }
+
+  const handleSend = async () => {
+    if (!inputValue.trim() || isLoading) return
+
+    const messageContent = inputValue.trim()
+    
+    // Clear any previous error
+    setServerError(null)
+    setIsLoading(true)
+    
+    try {
+      // Check if server is available before creating a new chat
+      const isServerAvailable = await checkServerHealth()
+      
+      if (!isServerAvailable) {
+        setServerError("Server is not available. Please make sure the backend server is running.")
+        setIsLoading(false)
+        return
+      }
+      
+      // Create a new chat session only if server is available
+      const newChat = createNewChat()
+      
+      // Navigate to chat page with message in URL params
+      // The chat page will detect the message param and send it automatically
+      router.push(`/chat?chatId=${newChat.id}&message=${encodeURIComponent(messageContent)}`)
+    } catch (error) {
+      setServerError("Unable to connect to the server. Please try again later.")
+      setIsLoading(false)
+    }
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
   }
 
   return (
@@ -35,6 +82,12 @@ export function HomeScreen() {
       {/* Chat Input Area at Bottom */}
       <div className="px-8 pb-4">
         <div className="max-w-4xl mx-auto">
+          {/* Server Error Message */}
+          {serverError && (
+            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-800">{serverError}</p>
+            </div>
+          )}
           <div className="relative flex items-center gap-2 bg-gray-100 rounded-xl px-4 py-3 shadow-sm">
             {/* Hidden File Input */}
             <input
@@ -64,8 +117,13 @@ export function HomeScreen() {
 
             {/* Input Field */}
             <Input
+              ref={inputRef}
               type="text"
               placeholder="Ask anything from here"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isLoading}
               className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-700 placeholder:text-gray-400"
             />
 
@@ -74,9 +132,15 @@ export function HomeScreen() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="w-8 h-8 rounded-full bg-white hover:bg-gray-200"
+                onClick={handleSend}
+                disabled={!inputValue.trim() || isLoading}
+                className="w-8 h-8 rounded-full bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Send className="h-4 w-4 text-gray-700" />
+                {isLoading ? (
+                  <div className="w-4 h-4 border-2 border-gray-700 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 text-gray-700" />
+                )}
               </Button>
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
                 Submit

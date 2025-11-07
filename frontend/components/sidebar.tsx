@@ -18,24 +18,28 @@ function SidebarContent() {
   const [hoveredChatId, setHoveredChatId] = useState<string | null>(null)
   
   // Sidebar state management
-  const [isPinned, setIsPinned] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sidebar_pinned")
-      return saved === "true"
-    }
-    return false
-  })
+  // Initialize with default values to avoid hydration mismatch
+  const [isPinned, setIsPinned] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sidebar_width")
-      const width = saved ? parseInt(saved, 10) : 240
-      // Ensure saved width is at least 140px
-      return Math.max(width, 140)
-    }
-    return 240
-  })
+  const [sidebarWidth, setSidebarWidth] = useState(240)
   const [isResizing, setIsResizing] = useState(false)
+  
+  // Load from localStorage only on client side after mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedPinned = localStorage.getItem("sidebar_pinned")
+      if (savedPinned === "true") {
+        setIsPinned(true)
+      }
+      
+      const savedWidth = localStorage.getItem("sidebar_width")
+      if (savedWidth) {
+        const width = parseInt(savedWidth, 10)
+        // Ensure saved width is at least 140px
+        setSidebarWidth(Math.max(width, 140))
+      }
+    }
+  }, [])
   
   const minWidth = 64 // Minimum width when collapsed
   const minExpandedWidth = 140 // Minimum width when expanded/pinned

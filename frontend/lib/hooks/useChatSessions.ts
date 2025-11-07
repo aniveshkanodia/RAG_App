@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import {
   ChatSession,
   Message,
@@ -32,11 +32,11 @@ export function useChatSessions() {
     return newSession
   }, [])
 
-  // Get current chat session
+  // Get current chat session from state (not localStorage) to avoid hydration issues
   const getCurrentChat = useCallback((): ChatSession | null => {
     if (!currentChatId) return null
-    return getChatSession(currentChatId)
-  }, [currentChatId])
+    return sessions.find((session) => session.id === currentChatId) || null
+  }, [currentChatId, sessions])
 
   // Set current chat ID
   const setCurrentChat = useCallback((chatId: string | null) => {
@@ -44,9 +44,12 @@ export function useChatSessions() {
   }, [])
 
   // Add a message to current chat
+  // Accepts optional chatId parameter to avoid relying on async state updates
   const addMessage = useCallback(
-    (message: Omit<Message, "id" | "timestamp">) => {
-      if (!currentChatId) return
+    (message: Omit<Message, "id" | "timestamp">, targetChatId?: string | null) => {
+      // Use provided chatId or fall back to currentChatId
+      const chatIdToUse = targetChatId ?? currentChatId
+      if (!chatIdToUse) return
 
       const newMessage: Message = {
         id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -54,12 +57,12 @@ export function useChatSessions() {
         timestamp: Date.now(),
       }
 
-      addMessageToChat(currentChatId, newMessage)
+      addMessageToChat(chatIdToUse, newMessage)
       
       // Update local state
       setSessions((prev) => {
         const updated = prev.map((session) => {
-          if (session.id === currentChatId) {
+          if (session.id === chatIdToUse) {
             const updatedMessages = [...session.messages, newMessage]
             return {
               ...session,
@@ -95,10 +98,14 @@ export function useChatSessions() {
     setSessions(loadedSessions)
   }, [])
 
+  // Use useMemo to avoid calling getCurrentChat during render
+  // This prevents hydration issues by ensuring consistent behavior
+  const currentChat = useMemo(() => getCurrentChat(), [currentChatId, sessions])
+
   return {
     sessions,
     currentChatId,
-    currentChat: getCurrentChat(),
+    currentChat,
     isLoading,
     createNewChat,
     setCurrentChat,

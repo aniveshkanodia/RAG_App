@@ -128,6 +128,62 @@ RAG_App/
   - Action: Try to send empty or whitespace-only message
   - Expected: Message is not sent, input remains empty
 
+### Bug Fix: Home Page Message Sending
+
+**Issue:** Users cannot send messages from the home page. They must create a new chat first.
+
+**Ideal Behavior:** 
+- User should be able to start a conversation directly from the home page
+- When a user sends a message from home page, it should automatically create a new chat and navigate to it
+- The message should be sent and displayed in the new chat
+
+**Implementation Steps:**
+
+1. **Step BF1**: Add state management to `HomeScreen` component
+   - Add `useState` for input value
+   - Add `useState` for loading state
+   - Import `useChatSessions` hook and `useRouter` from Next.js
+
+2. **Step BF2**: Implement `handleSend` function in `HomeScreen`
+   - Create a new chat session using `createNewChat()` from `useChatSessions` hook
+   - Navigate to `/chat?chatId={newChatId}` using Next.js router
+   - Store the message to send after navigation completes
+   - Send the message once on the chat page (or use URL params to trigger send)
+
+3. **Step BF3**: Add Enter key support
+   - Add `onKeyPress` handler to Input field
+   - Call `handleSend` when Enter is pressed (without Shift)
+
+4. **Step BF4**: Add loading state indicator
+   - Show loading spinner in send button when sending from home page
+   - Disable input and send button during loading
+
+5. **Step BF5**: Handle message sending after navigation
+   - Option A: Use URL search params to pass message and trigger send on chat page
+   - Option B: Store message in session storage and retrieve on chat page
+   - Option C: Send message immediately after navigation using the chatId
+
+**Files to Modify:**
+- `frontend/components/home-screen.tsx` - Add message sending functionality, state management, and navigation
+
+**Test Cases for Bug Fix:**
+
+- **TCBF1**: Test message sending from home page
+  - Action: Type message on home page and click send
+  - Expected: New chat is created, navigates to chat page, message is sent and displayed
+
+- **TCBF2**: Test Enter key from home page
+  - Action: Type message on home page and press Enter
+  - Expected: Same as TCBF1
+
+- **TCBF3**: Test loading state on home page
+  - Action: Send message from home page
+  - Expected: Loading spinner appears, input is disabled
+
+- **TCBF4**: Test empty message validation on home page
+  - Action: Try to send empty message from home page
+  - Expected: Message is not sent, no navigation occurs
+
 ### Phase 4: File Upload Feature (Backend)
 
 10.**Step 10**: Implement file upload endpoint (`POST /api/upload`) that processes files using `process_and_index_file()` from `rag_docling.py`

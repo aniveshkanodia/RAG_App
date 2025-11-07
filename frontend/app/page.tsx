@@ -1,3 +1,5 @@
+"use client"
+
 import { Sidebar } from "@/components/sidebar"
 import { HomeScreen } from "@/components/home-screen"
 
