@@ -4,12 +4,16 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import {
   ChatSession,
   Message,
+  UploadedFile,
   getChatSessions,
   createChatSession,
   updateChatSession,
   addMessageToChat,
   deleteChatSession,
   getChatSession,
+  addFileToChat,
+  getChatFiles,
+  removeFileFromChat,
 } from "@/lib/utils/chatUtils"
 
 export function useChatSessions() {
@@ -98,6 +102,75 @@ export function useChatSessions() {
     setSessions(loadedSessions)
   }, [])
 
+  // Add a file to a chat session
+  const addFile = useCallback(
+    (file: Omit<UploadedFile, "id" | "uploadTimestamp">, targetChatId?: string | null) => {
+      const chatIdToUse = targetChatId ?? currentChatId
+      if (!chatIdToUse) return
+
+      const newFile: UploadedFile = {
+        id: `file-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        ...file,
+        uploadTimestamp: Date.now(),
+      }
+
+      addFileToChat(chatIdToUse, newFile)
+
+      // Update local state
+      setSessions((prev) => {
+        const updated = prev.map((session) => {
+          if (session.id === chatIdToUse) {
+            const updatedFiles = [...(session.uploadedFiles || []), newFile]
+            return {
+              ...session,
+              uploadedFiles: updatedFiles,
+              updatedAt: Date.now(),
+            }
+          }
+          return session
+        })
+        return updated
+      })
+    },
+    [currentChatId]
+  )
+
+  // Get files for current chat
+  const getFiles = useCallback(
+    (chatId?: string | null): UploadedFile[] => {
+      const chatIdToUse = chatId ?? currentChatId
+      if (!chatIdToUse) return []
+      return getChatFiles(chatIdToUse)
+    },
+    [currentChatId]
+  )
+
+  // Remove a file from a chat session
+  const removeFile = useCallback(
+    (fileId: string, targetChatId?: string | null) => {
+      const chatIdToUse = targetChatId ?? currentChatId
+      if (!chatIdToUse) return
+
+      removeFileFromChat(chatIdToUse, fileId)
+
+      // Update local state
+      setSessions((prev) => {
+        const updated = prev.map((session) => {
+          if (session.id === chatIdToUse && session.uploadedFiles) {
+            return {
+              ...session,
+              uploadedFiles: session.uploadedFiles.filter((file) => file.id !== fileId),
+              updatedAt: Date.now(),
+            }
+          }
+          return session
+        })
+        return updated
+      })
+    },
+    [currentChatId]
+  )
+
   // Use useMemo to avoid calling getCurrentChat during render
   // This prevents hydration issues by ensuring consistent behavior
   const currentChat = useMemo(() => getCurrentChat(), [currentChatId, sessions])
@@ -112,6 +185,9 @@ export function useChatSessions() {
     addMessage,
     deleteChat,
     refreshSessions,
+    addFile,
+    getFiles,
+    removeFile,
   }
 }
 

@@ -8,6 +8,7 @@ import { useChatSessions } from "@/lib/hooks/useChatSessions"
 import type { Message } from "@/lib/utils/chatUtils"
 import { getChatSessions, saveChatSessions } from "@/lib/utils/chatUtils"
 import { chat, uploadFile } from "@/lib/api/client"
+import { FileSidebar } from "./file-sidebar"
 
 interface ChatWindowProps {
   chatId: string | null
@@ -21,7 +22,7 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' })
   const [isUploading, setIsUploading] = useState(false)
-  const { currentChat, addMessage, refreshSessions, setCurrentChat } = useChatSessions()
+  const { currentChat, addMessage, refreshSessions, setCurrentChat, addFile, getFiles, removeFile } = useChatSessions()
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   // Track processed initial messages per chatId to prevent duplicate sends
@@ -54,20 +55,50 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file) return
+    if (!file || !chatId) return
 
     // Clear previous status
     setUploadStatus({ type: null, message: '' })
     setIsUploading(true)
 
+    // Get file extension
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || ''
+    const fileType = fileExt === 'docx' || fileExt === 'doc' ? 'docx' : fileExt
+
+    // Add file to chat session with "uploading" status
+    addFile({
+      name: file.name,
+      type: fileType,
+      status: "uploading",
+    }, chatId)
+
+    // Store the file ID to update its status later
+    let fileId: string | null = null
+
     try {
       // Upload the file
       const response = await uploadFile(file)
       
+      // Update file status to "success" in chat session
+      refreshSessions()
+      const sessions = getChatSessions()
+      const sessionIndex = sessions.findIndex((s) => s.id === chatId)
+      if (sessionIndex !== -1 && sessions[sessionIndex].uploadedFiles) {
+        const files = sessions[sessionIndex].uploadedFiles
+        const lastFile = files[files.length - 1]
+        if (lastFile && lastFile.status === "uploading") {
+          fileId = lastFile.id
+          lastFile.status = "success"
+          sessions[sessionIndex].updatedAt = Date.now()
+          saveChatSessions(sessions)
+          refreshSessions()
+        }
+      }
+      
       // Show success message
       setUploadStatus({
         type: 'success',
-        message: response.message
+        message: `Successfully uploaded file ${file.name}.`
       })
       
       // Clear status after 5 seconds
@@ -75,6 +106,22 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
         setUploadStatus({ type: null, message: '' })
       }, 5000)
     } catch (error) {
+      // Update file status to "error" in chat session
+      refreshSessions()
+      const sessions = getChatSessions()
+      const sessionIndex = sessions.findIndex((s) => s.id === chatId)
+      if (sessionIndex !== -1 && sessions[sessionIndex].uploadedFiles) {
+        const files = sessions[sessionIndex].uploadedFiles
+        const lastFile = files[files.length - 1]
+        if (lastFile && lastFile.status === "uploading") {
+          fileId = lastFile.id
+          lastFile.status = "error"
+          sessions[sessionIndex].updatedAt = Date.now()
+          saveChatSessions(sessions)
+          refreshSessions()
+        }
+      }
+      
       // Show error message
       const errorMessage = error instanceof Error ? error.message : "Failed to upload file. Please try again."
       setUploadStatus({
@@ -398,9 +445,14 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
     }
   }
 
+  // Get uploaded files for current chat
+  const uploadedFiles = chatId ? getFiles(chatId) : []
+
   return (
-    <div className="flex-1 flex flex-col bg-gray-50 rounded-r-2xl overflow-hidden">
-      {/* Message List Area */}
+    <div className="flex-1 flex bg-gray-50 rounded-r-2xl overflow-hidden">
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Message List Area */}
       {messages.length === 0 ? (
         // Empty state: No scrollable container, just centered welcome message (matches home page)
         <div className="flex-1 flex flex-col items-center justify-center px-8 pb-24">
@@ -567,6 +619,15 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
           </div>
         </div>
       </div>
+      </div>
+
+      {/* File Sidebar - Right Side */}
+      {chatId && uploadedFiles.length > 0 && (
+        <FileSidebar 
+          files={uploadedFiles} 
+          onRemoveFile={(fileId) => removeFile(fileId, chatId)} 
+        />
+      )}
     </div>
   )
 }

@@ -1,9 +1,18 @@
+export interface UploadedFile {
+  id: string
+  name: string
+  type: string // "pdf", "txt", "docx", "doc"
+  uploadTimestamp: number
+  status: "success" | "uploading" | "error"
+}
+
 export interface ChatSession {
   id: string
   title: string // First message or "New Chat"
   createdAt: number
   updatedAt: number
   messages: Message[]
+  uploadedFiles: UploadedFile[]
 }
 
 export interface Message {
@@ -35,7 +44,12 @@ export function getChatSessions(): ChatSession[] {
   try {
     const stored = localStorage.getItem(CHAT_STORAGE_KEY)
     if (!stored) return []
-    return JSON.parse(stored) as ChatSession[]
+    const sessions = JSON.parse(stored) as ChatSession[]
+    // Ensure backward compatibility: add uploadedFiles if missing
+    return sessions.map((session) => ({
+      ...session,
+      uploadedFiles: session.uploadedFiles || [],
+    }))
   } catch (error) {
     console.error("Error reading chat sessions from localStorage:", error)
     return []
@@ -73,6 +87,7 @@ export function createChatSession(): ChatSession {
     createdAt: Date.now(),
     updatedAt: Date.now(),
     messages: [],
+    uploadedFiles: [],
   }
   
   const sessions = getChatSessions()
@@ -126,5 +141,48 @@ export function deleteChatSession(chatId: string): void {
   const sessions = getChatSessions()
   const filtered = sessions.filter((session) => session.id !== chatId)
   saveChatSessions(filtered)
+}
+
+/**
+ * Add a file to a chat session
+ */
+export function addFileToChat(chatId: string, file: UploadedFile): void {
+  const sessions = getChatSessions()
+  const index = sessions.findIndex((session) => session.id === chatId)
+  
+  if (index !== -1) {
+    // Ensure uploadedFiles array exists
+    if (!sessions[index].uploadedFiles) {
+      sessions[index].uploadedFiles = []
+    }
+    
+    sessions[index].uploadedFiles.push(file)
+    sessions[index].updatedAt = Date.now()
+    saveChatSessions(sessions)
+  }
+}
+
+/**
+ * Get files for a specific chat session
+ */
+export function getChatFiles(chatId: string): UploadedFile[] {
+  const session = getChatSession(chatId)
+  return session?.uploadedFiles || []
+}
+
+/**
+ * Remove a file from a chat session
+ */
+export function removeFileFromChat(chatId: string, fileId: string): void {
+  const sessions = getChatSessions()
+  const index = sessions.findIndex((session) => session.id === chatId)
+  
+  if (index !== -1 && sessions[index].uploadedFiles) {
+    sessions[index].uploadedFiles = sessions[index].uploadedFiles.filter(
+      (file) => file.id !== fileId
+    )
+    sessions[index].updatedAt = Date.now()
+    saveChatSessions(sessions)
+  }
 }
 

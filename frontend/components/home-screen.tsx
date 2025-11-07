@@ -35,7 +35,7 @@ export function HomeScreen() {
       // Show success message
       setUploadStatus({
         type: 'success',
-        message: response.message
+        message: `Successfully uploaded file ${file.name}.`
       })
       
       // Clear status after 5 seconds
