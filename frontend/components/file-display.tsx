@@ -75,4 +75,3 @@ export function FileDisplay({ fileName, fileType, uploadStatus, onRemove }: File
     </div>
   )
 }
-

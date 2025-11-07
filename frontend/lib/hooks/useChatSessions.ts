@@ -103,10 +103,11 @@ export function useChatSessions() {
   }, [])
 
   // Add a file to a chat session
+  // Returns the file ID so it can be tracked for status updates
   const addFile = useCallback(
-    (file: Omit<UploadedFile, "id" | "uploadTimestamp">, targetChatId?: string | null) => {
+    (file: Omit<UploadedFile, "id" | "uploadTimestamp">, targetChatId?: string | null): string | null => {
       const chatIdToUse = targetChatId ?? currentChatId
-      if (!chatIdToUse) return
+      if (!chatIdToUse) return null
 
       const newFile: UploadedFile = {
         id: `file-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -131,6 +132,8 @@ export function useChatSessions() {
         })
         return updated
       })
+      
+      return newFile.id
     },
     [currentChatId]
   )

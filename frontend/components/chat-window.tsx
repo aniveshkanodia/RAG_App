@@ -631,4 +631,3 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
     </div>
   )
 }
-
