@@ -292,18 +292,18 @@ RAG_App/
 
 ### To-dos
 
-- [ ] Step 1: Create basic FastAPI server structure (api_server.py) with CORS configuration for port 8000
-- [ ] Step 2: Add health check endpoint (GET /api/health) to verify server is running
-- [ ] Step 3: Update requirements.txt with fastapi, uvicorn, and python-multipart dependencies
-- [ ] Step 4: Implement chat endpoint (POST /api/chat) that accepts questions and returns answers using run_pipeline() from backend/rag.py
-- [ ] Step 5: Test chat endpoint independently with curl/Postman to verify backend works
-- [ ] Step 6: Create API client utility (frontend/lib/api/client.ts) with base URL configuration
-- [ ] Step 7: Implement chat() function in API client to call POST /api/chat
-- [ ] Step 8: Update chat-window.tsx handleSend() to call chat API instead of placeholder
-- [ ] Step 9: Add loading states and error handling to chat window for better UX
-- [ ] Step 10: Implement file upload endpoint (POST /api/upload) that processes files using process_and_index_file() from backend/document_processor.py
-- [ ] Step 11: Test file upload endpoint independently to verify backend works
-- [ ] Step 12: Implement uploadFile() function in API client to call POST /api/upload with FormData
-- [ ] Step 13: Update file upload handler in chat-window.tsx to call upload API
-- [ ] Step 14: Update file upload handler in home-screen.tsx to call upload API
-- [ ] Step 15: Add upload progress/status feedback in UI components
+- [X] Step 1: Create basic FastAPI server structure (api_server.py) with CORS configuration for port 8000
+- [X] Step 2: Add health check endpoint (GET /api/health) to verify server is running
+- [X] Step 3: Update requirements.txt with fastapi, uvicorn, and python-multipart dependencies
+- [X] Step 4: Implement chat endpoint (POST /api/chat) that accepts questions and returns answers using run_pipeline() from backend/rag.py
+- [X] Step 5: Test chat endpoint independently with curl/Postman to verify backend works
+- [X] Step 6: Create API client utility (frontend/lib/api/client.ts) with base URL configuration
+- [X] Step 7: Implement chat() function in API client to call POST /api/chat
+- [X] Step 8: Update chat-window.tsx handleSend() to call chat API instead of placeholder
+- [X] Step 9: Add loading states and error handling to chat window for better UX
+- [X] Step 10: Implement file upload endpoint (POST /api/upload) that processes files using process_and_index_file() from backend/document_processor.py
+- [X] Step 11: Test file upload endpoint independently to verify backend works
+- [X] Step 12: Implement uploadFile() function in API client to call POST /api/upload with FormData
+- [X] Step 13: Update file upload handler in chat-window.tsx to call upload API
+- [X] Step 14: Update file upload handler in home-screen.tsx to call upload API
+- [X] Step 15: Add upload progress/status feedback in UI components
