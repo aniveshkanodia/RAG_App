@@ -59,7 +59,7 @@ def load_document(file_path: str) -> List[Document]:
 
 def process_documents_for_chunking(
     documents: List[Document], 
-    file_path: str
+    file_ext: str
 ) -> List[Document]:
     """Process documents for chunking based on the export type.
     
@@ -68,13 +68,11 @@ def process_documents_for_chunking(
     
     Args:
         documents: List of Document objects
-        file_path: Path to the file (to determine processing mode)
+        file_ext: File extension (e.g., ".pdf", ".txt") to determine processing mode
         
     Returns:
         List of processed Document chunks
     """
-    file_ext = os.path.splitext(file_path)[1].lower()
-    
     # PDF files are already chunked by DoclingLoader with ExportType.DOC_CHUNKS
     if file_ext == ".pdf":
         return documents
@@ -113,11 +111,14 @@ def process_and_index_file(file_path: str) -> str:
         if vectordb is None:  # type: ignore[misc]
             return "Error: Vector database not initialized."
         
+        # Extract file extension once for use in multiple functions
+        file_ext = os.path.splitext(file_path)[1].lower()
+        
         # Load document (PDFs use DoclingLoader automatically)
         documents = load_document(file_path)
         
         # Process documents for chunking
-        chunks = process_documents_for_chunking(documents, file_path)
+        chunks = process_documents_for_chunking(documents, file_ext)
         
         # Add metadata about the source file if not present
         # Note: ChromaDB only accepts simple types (str, int, float, bool, None)
@@ -149,7 +150,6 @@ def process_and_index_file(file_path: str) -> str:
         vectordb.add_documents(documents=chunks)  # type: ignore[misc]
         
         # Provide detailed status
-        file_ext = os.path.splitext(file_path)[1].lower()
         status = f"Successfully uploaded and indexed {len(chunks)} chunks from {os.path.basename(file_path)}"
         if file_ext == ".pdf":
             status += "\n(Processed document ready for chat)"
