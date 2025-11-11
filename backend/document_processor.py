@@ -19,7 +19,7 @@ from langchain_docling.loader import ExportType
 import backend.rag as rag_module
 
 
-def load_document(file_path: str) -> List[Document]:
+def load_document(file_path: str, file_ext: str) -> List[Document]:
     """Load a document based on its file extension.
     
     For PDF files, uses DoclingLoader to preserve structure.
@@ -27,6 +27,7 @@ def load_document(file_path: str) -> List[Document]:
     
     Args:
         file_path: Path to the file to load
+        file_ext: File extension (e.g., ".pdf", ".txt") to determine loader type
         
     Returns:
         List of Document objects from the file
@@ -34,8 +35,6 @@ def load_document(file_path: str) -> List[Document]:
     Raises:
         ValueError: If file type is not supported
     """
-    file_ext = os.path.splitext(file_path)[1].lower()
-    
     if file_ext == ".pdf":
         loader = DoclingLoader(
             file_path=file_path,
@@ -115,7 +114,7 @@ def process_and_index_file(file_path: str) -> str:
         file_ext = os.path.splitext(file_path)[1].lower()
         
         # Load document (PDFs use DoclingLoader automatically)
-        documents = load_document(file_path)
+        documents = load_document(file_path, file_ext)
         
         # Process documents for chunking
         chunks = process_documents_for_chunking(documents, file_ext)
