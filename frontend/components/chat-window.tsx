@@ -190,6 +190,10 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
       // Ensure currentChatId is set in the hook
       setCurrentChat(chatId)
       
+      // Calculate turn_index: count user messages before adding the new one
+      const userMessages = messages.filter(m => m.role === "user");
+      const turnIndex = userMessages.length;
+      
       // Clear input
       setInputValue("")
       
@@ -206,8 +210,8 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
       setIsLoading(true)
       
       try {
-        // Call the API to get the answer
-        const response = await chat(userMessageContent)
+        // Call the API to get the answer with conversation_id and turn_index
+        const response = await chat(userMessageContent, chatId, turnIndex)
         
         // Format the answer with sources if available
         let answerContent = response.answer
@@ -281,6 +285,10 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
     // Clear input immediately for better UX
     setInputValue("")
 
+    // Calculate turn_index: count user messages before adding the new one
+    const userMessages = messages.filter(m => m.role === "user");
+    const turnIndex = userMessages.length;
+
     // Add user message using the hook (which updates state)
     // Pass chatId directly to avoid relying on async state updates
     // This should trigger a re-render with the new message
@@ -296,8 +304,8 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
     setIsLoading(true)
 
     try {
-      // Call the API to get the answer
-      const response = await chat(userMessageContent)
+      // Call the API to get the answer with conversation_id and turn_index
+      const response = await chat(userMessageContent, sendingChatId, turnIndex)
       
       // Verify the chatId is still the same before adding the response
       if (chatId === sendingChatId && sendingChatId) {
@@ -379,11 +387,17 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
     const userMessageContent = lastUserMessage.content
     const sendingChatId = chatId
 
+    // Calculate turn_index: count user messages up to and including the one being retried
+    // Find the index of the user message in the messages array
+    const userMessageIndex = messages.findIndex(m => m === lastUserMessage);
+    const userMessagesBefore = messages.slice(0, userMessageIndex + 1).filter(m => m.role === "user");
+    const turnIndex = userMessagesBefore.length - 1; // -1 because we want 0-indexed
+
     setIsLoading(true)
 
     try {
-      // Call the API to get the answer
-      const response = await chat(userMessageContent)
+      // Call the API to get the answer with conversation_id and turn_index
+      const response = await chat(userMessageContent, sendingChatId, turnIndex)
 
       // Format the answer with sources if available
       let answerContent = response.answer

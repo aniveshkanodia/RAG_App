@@ -54,21 +54,35 @@ export async function checkServerHealth(): Promise<boolean> {
  * Sends a chat question to the backend and returns the answer.
  * 
  * @param question - The user's question
+ * @param conversationId - Optional conversation ID to track multi-turn conversations
+ * @param turnIndex - Optional turn index within the conversation (0, 1, 2, ...)
  * @returns Promise resolving to the chat response with answer and sources
  * @throws Error if the request fails
  */
-export async function chat(question: string): Promise<ChatResponse> {
+export async function chat(
+  question: string,
+  conversationId?: string,
+  turnIndex?: number
+): Promise<ChatResponse> {
   if (!question || !question.trim()) {
     throw new Error("Question cannot be empty");
   }
 
   try {
+    const body: any = { question: question.trim() };
+    if (conversationId) {
+      body.conversation_id = conversationId;
+    }
+    if (turnIndex !== undefined) {
+      body.turn_index = turnIndex;
+    }
+
     const response = await fetch(`${API_BASE_URL}/api/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ question: question.trim() }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
