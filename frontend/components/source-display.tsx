@@ -20,9 +20,9 @@ function SourceCard({ source, index }: SourceCardProps) {
   // Extract metadata
   const metadata = source.metadata || {}
   
-  // Extract source file name
+  // Extract source file name - prefer filename over source path
+  const fileName = metadata.filename || (metadata.source ? metadata.source.split('/').pop() : "") || "Unknown source"
   const sourcePath = metadata.source || ""
-  const fileName = sourcePath.split('/').pop() || sourcePath || "Unknown source"
   
   // Extract headings from dl_meta
   let headings: string[] = []

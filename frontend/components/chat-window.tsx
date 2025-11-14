@@ -5,7 +5,7 @@ import { Plus, Send, RotateCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useChatSessions } from "@/lib/hooks/useChatSessions"
-import type { Message } from "@/lib/utils/chatUtils"
+import type { Message, UploadedFile } from "@/lib/utils/chatUtils"
 import { getChatSessions, saveChatSessions } from "@/lib/utils/chatUtils"
 import { chat, uploadFile } from "@/lib/api/client"
 import { FileSidebar } from "./file-sidebar"
@@ -23,6 +23,7 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' })
   const [isUploading, setIsUploading] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const { currentChat, addMessage, refreshSessions, setCurrentChat, addFile, getFiles, removeFile } = useChatSessions()
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -38,6 +39,16 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
       setCurrentChat(chatId)
     }
   }, [chatId, setCurrentChat])
+  
+  // Load uploaded files for current chat (client-side only to avoid hydration issues)
+  useEffect(() => {
+    if (chatId && typeof window !== "undefined") {
+      const files = getFiles(chatId)
+      setUploadedFiles(files)
+    } else {
+      setUploadedFiles([])
+    }
+  }, [chatId, getFiles, currentChat?.uploadedFiles])
   
   // Auto-scroll to bottom when messages change
   useLayoutEffect(() => {
@@ -77,8 +88,8 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
     let fileId: string | null = null
 
     try {
-      // Upload the file
-      const response = await uploadFile(file)
+      // Upload the file with conversation_id
+      const response = await uploadFile(file, chatId)
       
       // Update file status to "success" in chat session
       refreshSessions()
@@ -93,6 +104,8 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
           sessions[sessionIndex].updatedAt = Date.now()
           saveChatSessions(sessions)
           refreshSessions()
+          // Update local state
+          setUploadedFiles([...files])
         }
       }
       
@@ -120,6 +133,8 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
           sessions[sessionIndex].updatedAt = Date.now()
           saveChatSessions(sessions)
           refreshSessions()
+          // Update local state
+          setUploadedFiles([...files])
         }
       }
       
@@ -420,8 +435,7 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
     }
   }
 
-  // Get uploaded files for current chat
-  const uploadedFiles = chatId ? getFiles(chatId) : []
+  // uploadedFiles is now managed via useState and useEffect above
 
   return (
     <div className="flex-1 flex bg-gray-50 rounded-r-2xl overflow-hidden">
@@ -519,7 +533,7 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
               type="file"
               className="hidden"
               onChange={handleFileUpload}
-              accept=".pdf,.txt,.doc,.docx"
+              accept=".pdf,.txt,.doc,.docx,.xlsx,.xls"
             />
             
             {/* Upload Button */}
@@ -585,7 +599,14 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
       {chatId && uploadedFiles.length > 0 && (
         <FileSidebar 
           files={uploadedFiles} 
-          onRemoveFile={(fileId) => removeFile(fileId, chatId)} 
+          onRemoveFile={(fileId) => {
+            removeFile(fileId, chatId)
+            // Update local state after removal
+            if (typeof window !== "undefined") {
+              const updatedFiles = getFiles(chatId)
+              setUploadedFiles(updatedFiles)
+            }
+          }} 
         />
       )}
     </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { FileText, File, CheckCircle2 } from "lucide-react"
+import { FileText, File, CheckCircle2, FileSpreadsheet } from "lucide-react"
 
 interface FileDisplayProps {
   fileName: string
@@ -15,6 +15,9 @@ export function FileDisplay({ fileName, fileType, uploadStatus, onRemove }: File
     const ext = fileType.toLowerCase()
     if (ext === "pdf") {
       return <FileText className="h-8 w-8 text-red-600" />
+    }
+    if (ext === "xlsx" || ext === "xls") {
+      return <FileSpreadsheet className="h-8 w-8 text-green-600" />
     }
     return <File className="h-8 w-8 text-blue-600" />
   }

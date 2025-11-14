@@ -142,7 +142,7 @@ export function HomeScreen() {
               type="file"
               className="hidden"
               onChange={handleFileUpload}
-              accept=".pdf,.txt,.doc,.docx"
+              accept=".pdf,.txt,.doc,.docx,.xlsx,.xls"
             />
             
             {/* Upload Button */}

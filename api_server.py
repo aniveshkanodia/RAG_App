@@ -3,7 +3,7 @@ FastAPI server for RAG application.
 Provides REST API endpoints for chat and file upload functionality.
 """
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, List, Optional, Any
@@ -47,6 +47,9 @@ _conversation_turn_index: Dict[str, int] = {}
 def get_chunking_strategy(context_docs: List[Any]) -> str:
     """Determine chunking strategy identifier based on retrieved documents.
     
+    All files loaded with DoclingLoader (PDF, DOCX, XLSX, etc.) use unified
+    Docling chunking via HybridChunker. TXT files may use fixed-size chunking.
+    
     Args:
         context_docs: List of retrieved document chunks
         
@@ -54,32 +57,35 @@ def get_chunking_strategy(context_docs: List[Any]) -> str:
         Chunking strategy identifier string
     """
     # Check if documents have metadata indicating chunking strategy
-    # PDFs chunked with DoclingLoader typically have dl_meta in metadata
+    # Files chunked with DoclingLoader typically have dl_meta in metadata
     has_docling_meta = False
     has_fixed_chunking = False
     
+    # Docling-supported file extensions
+    docling_extensions = ('.pdf', '.docx', '.doc', '.xlsx', '.xls')
+    
     for doc in context_docs:
         if hasattr(doc, 'metadata') and doc.metadata:
-            # Check for docling metadata (PDFs)
+            # Check for docling metadata (indicates DoclingLoader was used)
             if 'dl_meta' in doc.metadata:
                 has_docling_meta = True
             # Check for source file extension to infer strategy
             source = doc.metadata.get('source', '')
-            if source.endswith('.pdf'):
+            if source.endswith(docling_extensions):
                 has_docling_meta = True
-            elif source.endswith(('.txt', '.docx', '.doc')):
+            elif source.endswith('.txt'):
                 has_fixed_chunking = True
     
     # Determine strategy identifier
     if has_docling_meta and has_fixed_chunking:
-        return "mixed_docling_semantic_and_fixed_1000_overlap_100"
+        return "docling_hybrid_unified_with_txt_fallback"
     elif has_docling_meta:
-        return "docling_semantic"
+        return "docling_hybrid_unified"
     elif has_fixed_chunking:
         return "fixed_1000_overlap_100"
     else:
-        # Default fallback based on system configuration
-        return "docling_semantic_for_pdf_fixed_1000_overlap_100_for_others"
+        # Default fallback - assume unified docling chunking
+        return "docling_hybrid_unified"
 
 
 # Request/Response models
@@ -158,8 +164,8 @@ async def chat(request: ChatRequest) -> ChatResponse:
     user_query = request.question.strip()
     
     try:
-        # Run RAG pipeline
-        response = run_pipeline(user_query)
+        # Run RAG pipeline with conversation_id for file filtering
+        response = run_pipeline(user_query, conversation_id=conversation_id)
         
         # Extract answer and context
         answer = response.get("answer", "")
@@ -207,11 +213,15 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
 
 @app.post("/api/upload", response_model=UploadResponse)
-async def upload_file(file: UploadFile = File(...)) -> UploadResponse:
+async def upload_file(
+    file: UploadFile = File(...),
+    conversation_id: Optional[str] = Form(None)
+) -> UploadResponse:
     """File upload endpoint that processes and indexes uploaded files.
     
     Args:
-        file: Uploaded file (PDF, TXT, DOCX, or DOC)
+        file: Uploaded file (PDF, TXT, DOCX, DOC, XLSX, or XLS)
+        conversation_id: Optional conversation ID to associate the file with a chat session
         
     Returns:
         UploadResponse with success message and number of chunks indexed
@@ -228,13 +238,16 @@ async def upload_file(file: UploadFile = File(...)) -> UploadResponse:
     
     # Validate file extension
     file_ext = os.path.splitext(file.filename or "")[1].lower()
-    supported_extensions = [".pdf", ".txt", ".docx", ".doc"]
+    supported_extensions = [".pdf", ".txt", ".docx", ".doc", ".xlsx", ".xls"]
     
     if file_ext not in supported_extensions:
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported file type: {file_ext}. Supported types: {', '.join(supported_extensions)}"
         )
+    
+    # Extract original filename at upload time
+    original_filename = file.filename
     
     # Create temporary file to save uploaded file
     temp_file_path = None
@@ -249,12 +262,17 @@ async def upload_file(file: UploadFile = File(...)) -> UploadResponse:
             )
         
         # Create temporary file with original extension
+        # (Necessary for document loaders which require a file path)
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
             temp_file.write(file_content)
             temp_file_path = temp_file.name
         
-        # Process and index the file
-        result_message = process_and_index_file(temp_file_path)
+        # Process and index the file (pass original filename from upload)
+        result_message = process_and_index_file(
+            temp_file_path, 
+            conversation_id=conversation_id,
+            original_filename=original_filename
+        )
         
         # Extract number of chunks from result message if available
         chunks = None

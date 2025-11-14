@@ -123,17 +123,21 @@ export async function chat(
  * Uploads a file to the backend for processing and indexing.
  * 
  * @param file - The file to upload
+ * @param conversationId - Optional conversation ID to associate the file with a chat session
  * @returns Promise resolving to the upload response with message and chunk count
  * @throws Error if the request fails
  */
-export async function uploadFile(file: File): Promise<UploadResponse> {
+export async function uploadFile(
+  file: File,
+  conversationId?: string
+): Promise<UploadResponse> {
   if (!file) {
     throw new Error("No file provided");
   }
 
   // Validate file type
   const fileExt = file.name.split('.').pop()?.toLowerCase();
-  const supportedExtensions = ['pdf', 'txt', 'docx', 'doc'];
+  const supportedExtensions = ['pdf', 'txt', 'docx', 'doc', 'xlsx', 'xls'];
   
   if (!fileExt || !supportedExtensions.includes(fileExt)) {
     throw new Error(`Unsupported file type: .${fileExt}. Supported types: ${supportedExtensions.join(', ')}`);
@@ -143,6 +147,11 @@ export async function uploadFile(file: File): Promise<UploadResponse> {
     // Create FormData with the file
     const formData = new FormData();
     formData.append('file', file);
+    
+    // Add conversation_id if provided
+    if (conversationId) {
+      formData.append('conversation_id', conversationId);
+    }
 
     const response = await fetch(`${API_BASE_URL}/api/upload`, {
       method: "POST",

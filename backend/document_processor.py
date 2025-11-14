@@ -5,10 +5,10 @@ Contains functions for loading, processing, and indexing documents.
 
 import os
 import json
-from typing import List
+from typing import List, Optional
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import TextLoader, UnstructuredWordDocumentLoader
+from langchain_community.document_loaders import TextLoader
 from langchain_core.documents import Document
 
 # Docling imports
@@ -22,8 +22,8 @@ import backend.rag as rag_module
 def load_document(file_path: str, file_ext: str) -> List[Document]:
     """Load a document based on its file extension.
     
-    For PDF files, uses DoclingLoader to preserve structure.
-    For other file types, uses standard loaders.
+    Uses DoclingLoader for all Docling-supported file types (PDF, DOCX, XLSX, etc.)
+    to standardize chunking. Falls back to standard loaders for unsupported types.
     
     Args:
         file_path: Path to the file to load
@@ -35,22 +35,23 @@ def load_document(file_path: str, file_ext: str) -> List[Document]:
     Raises:
         ValueError: If file type is not supported
     """
-    if file_ext == ".pdf":
+    # File types supported by DoclingLoader (use ExportType.DOC_CHUNKS for consistent chunking)
+    docling_supported = [".pdf", ".docx", ".doc", ".xlsx", ".xls"]
+    
+    if file_ext in docling_supported:
         loader = DoclingLoader(
             file_path=file_path,
             export_type=ExportType.DOC_CHUNKS  # Preserves structure with semantic chunking
         )
         documents = loader.load()
     elif file_ext == ".txt":
+        # TXT files: fallback to TextLoader (Docling may not support plain text)
         loader = TextLoader(file_path)
-        documents = loader.load()
-    elif file_ext in [".docx", ".doc"]:
-        loader = UnstructuredWordDocumentLoader(file_path)
         documents = loader.load()
     else:
         raise ValueError(
             f"Unsupported file type: {file_ext}. "
-            f"Supported types: .pdf, .txt, .docx, .doc"
+            f"Supported types: .pdf, .txt, .docx, .doc, .xlsx, .xls"
         )
     
     return documents
@@ -62,8 +63,9 @@ def process_documents_for_chunking(
 ) -> List[Document]:
     """Process documents for chunking based on the export type.
     
-    For PDF files with DOC_CHUNKS mode, documents are already chunked by HybridChunker.
-    For other document types, use standard text splitting.
+    Files loaded with DoclingLoader (PDF, DOCX, XLSX, etc.) are already chunked
+    by HybridChunker via ExportType.DOC_CHUNKS. For other file types (e.g., TXT),
+    use standard text splitting.
     
     Args:
         documents: List of Document objects
@@ -72,11 +74,14 @@ def process_documents_for_chunking(
     Returns:
         List of processed Document chunks
     """
-    # PDF files are already chunked by DoclingLoader with ExportType.DOC_CHUNKS
-    if file_ext == ".pdf":
+    # File types that use DoclingLoader are already chunked via ExportType.DOC_CHUNKS
+    docling_supported = [".pdf", ".docx", ".doc", ".xlsx", ".xls"]
+    
+    if file_ext in docling_supported:
+        # Documents are already chunked by DoclingLoader with HybridChunker
         return documents
     
-    # For non-PDF files, use standard text splitting
+    # For non-Docling files (e.g., TXT), use standard text splitting
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=100,
@@ -87,11 +92,13 @@ def process_documents_for_chunking(
     return chunks
 
 
-def process_and_index_file(file_path: str) -> str:
+def process_and_index_file(file_path: str, conversation_id: Optional[str] = None, original_filename: Optional[str] = None) -> str:
     """Process an uploaded file and add it to the vector database.
     
     Args:
-        file_path: Path to the uploaded file
+        file_path: Path to the uploaded file (may be temporary)
+        conversation_id: Optional conversation ID to associate the file with a chat session
+        original_filename: Original filename from upload (used for chunk IDs)
         
     Returns:
         Status message indicating success or error
@@ -110,6 +117,12 @@ def process_and_index_file(file_path: str) -> str:
         if vectordb is None:  # type: ignore[misc]
             return "Error: Vector database not initialized."
         
+        # Use original filename if provided, otherwise fall back to file_path basename
+        if original_filename:
+            base_filename = os.path.basename(original_filename)
+        else:
+            base_filename = os.path.basename(file_path)
+        
         # Extract file extension once for use in multiple functions
         file_ext = os.path.splitext(file_path)[1].lower()
         
@@ -118,6 +131,12 @@ def process_and_index_file(file_path: str) -> str:
         
         # Process documents for chunking
         chunks = process_documents_for_chunking(documents, file_ext)
+        
+        # Generate IDs based on original filename with simple numeric suffix
+        # Format: {filename}_0, {filename}_1, etc.
+        # Sanitize filename to ensure valid ID format
+        safe_filename = "".join(c if c.isalnum() or c in ('_', '-', '.') else '_' for c in base_filename)
+        chunk_ids = [f"{safe_filename}_{i}" for i in range(len(chunks))]
         
         # Add metadata about the source file if not present
         # Note: ChromaDB only accepts simple types (str, int, float, bool, None)
@@ -136,21 +155,28 @@ def process_and_index_file(file_path: str) -> str:
                     # Convert other types to string
                     cleaned_metadata[key] = str(value) if value else None
             
-            # Ensure source and filename are present
+            # Ensure source and filename are present (use original filename)
             if "source" not in cleaned_metadata:
                 cleaned_metadata["source"] = file_path
             if "filename" not in cleaned_metadata:
-                cleaned_metadata["filename"] = os.path.basename(file_path)
+                cleaned_metadata["filename"] = base_filename
+            
+            # Add conversation_id to metadata if provided
+            # This allows filtering documents by chat session
+            if conversation_id is not None:
+                cleaned_metadata["conversation_id"] = conversation_id
             
             # Update chunk metadata with cleaned version
             chunk.metadata = cleaned_metadata
         
-        # Add to existing vector database
-        vectordb.add_documents(documents=chunks)  # type: ignore[misc]
+        # Add to existing vector database with custom IDs based on original filename
+        vectordb.add_documents(documents=chunks, ids=chunk_ids)  # type: ignore[misc]
         
         # Provide detailed status
-        status = f"Successfully uploaded and indexed {len(chunks)} chunks from {os.path.basename(file_path)}"
-        if file_ext == ".pdf":
+        status = f"Successfully uploaded and indexed {len(chunks)} chunks from {base_filename}"
+        # All DoclingLoader files are processed and ready for chat
+        docling_supported = [".pdf", ".docx", ".doc", ".xlsx", ".xls"]
+        if file_ext in docling_supported:
             status += "\n(Processed document ready for chat)"
         
         return status

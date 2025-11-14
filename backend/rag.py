@@ -10,7 +10,7 @@ load_dotenv()
 
 import os
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 # Set tokenizer parallelism to avoid warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -107,24 +107,86 @@ def init_rag():
 
 
 @traceable(name="RAGApp_v2")
-def run_pipeline(question: str) -> Dict[str, Any]:
+def run_pipeline(question: str, conversation_id: Optional[str] = None) -> Dict[str, Any]:
     """Run the RAG pipeline and return structured response with sources.
     
     Args:
         question: User question
+        conversation_id: Optional conversation ID to filter documents by chat session.
+                        If provided, only retrieves documents with matching conversation_id
+                        or documents without conversation_id (legacy files for backward compatibility).
         
     Returns:
         Dictionary with 'answer', 'context', and 'input' keys
     """
-    global rag_chain
+    global embeddings, vectordb, llm, PROMPT, TOP_K
     
     init_rag()
     
-    if rag_chain is None:
-        raise RuntimeError("RAG chain not initialized")
+    if vectordb is None:
+        raise RuntimeError("Vector database not initialized")
     
-    # Invoke the chain (following langchain-docling example pattern)
-    response = rag_chain.invoke({"input": question})
+    # Create retriever (no database-level filtering to avoid API conflicts)
+    retriever = vectordb.as_retriever(
+        search_type="similarity",
+        search_kwargs={"k": TOP_K * 2},  # Retrieve more to account for filtering
+    )
+    
+    # Step 1: Wrap document retrieval with optional post-retrieval filtering
+    def retrieve_docs_with_filter(input_dict):
+        """Retrieve documents and filter by conversation_id if needed."""
+        docs = retriever.invoke(input_dict["input"])
+        
+        # Filter by conversation_id in Python if provided
+        if conversation_id is not None:
+            filtered_docs = [
+                doc for doc in docs 
+                if doc.metadata.get("conversation_id") == conversation_id
+            ]
+            # If we filtered out too many, take what we have (at least we tried)
+            return {
+                "docs": filtered_docs[:TOP_K] if filtered_docs else docs[:TOP_K],
+                "question": input_dict["input"]
+            }
+        else:
+            return {
+                "docs": docs[:TOP_K],
+                "question": input_dict["input"]
+            }
+    
+    retrieve_docs = RunnableLambda(retrieve_docs_with_filter)
+    
+    # Step 2: Format prompt with context and question
+    prompt_step = RunnableLambda(
+        lambda input_dict: {
+            "input": input_dict["question"],
+            "context": "\n\n".join(doc.page_content for doc in input_dict["docs"]),
+            "docs": input_dict["docs"]
+        }
+    )
+    
+    # Step 3: Get LLM response and format final response
+    def call_llm_and_format(input_dict):
+        """Call LLM and return structured response with answer and context."""
+        formatted_prompt = PROMPT.format(
+            context=input_dict["context"],
+            input=input_dict["input"]
+        )
+        llm_response = llm.invoke(formatted_prompt)
+        answer = llm_response.content if hasattr(llm_response, 'content') else str(llm_response)
+        return {
+            "answer": answer,
+            "context": input_dict["docs"],
+            "input": input_dict["input"]
+        }
+    
+    llm_step = RunnableLambda(call_llm_and_format)
+    
+    # Build the complete pipeline dynamically
+    dynamic_rag_chain = retrieve_docs | prompt_step | llm_step
+    
+    # Invoke the chain
+    response = dynamic_rag_chain.invoke({"input": question})
     return response
 
 

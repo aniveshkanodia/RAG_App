@@ -3,7 +3,7 @@ import type { SourceInfo } from "@/lib/api/client"
 export interface UploadedFile {
   id: string
   name: string
-  type: string // "pdf", "txt", "docx", "doc"
+  type: string // "pdf", "txt", "docx", "doc", "xlsx", "xls"
   uploadTimestamp: number
   status: "success" | "uploading" | "error"
 }
