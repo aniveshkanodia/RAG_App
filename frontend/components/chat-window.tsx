@@ -9,6 +9,7 @@ import type { Message } from "@/lib/utils/chatUtils"
 import { getChatSessions, saveChatSessions } from "@/lib/utils/chatUtils"
 import { chat, uploadFile } from "@/lib/api/client"
 import { FileSidebar } from "./file-sidebar"
+import { SourceDisplay } from "./source-display"
 
 interface ChatWindowProps {
   chatId: string | null
@@ -185,7 +186,10 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
     
     // Use setTimeout to ensure state is updated and chat is ready
     setTimeout(async () => {
-      if (!chatId) return
+      if (!chatId) {
+        console.error("Cannot send initial message: chatId is required");
+        return;
+      }
       
       // Ensure currentChatId is set in the hook
       setCurrentChat(chatId)
@@ -213,30 +217,14 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
         // Call the API to get the answer with conversation_id and turn_index
         const response = await chat(userMessageContent, chatId, turnIndex)
         
-        // Format the answer with sources if available
-        let answerContent = response.answer
-        
-        // Add sources information if available
-        if (response.sources && response.sources.length > 0) {
-          answerContent += "\n\n--- Sources ---"
-          response.sources.forEach((source, index) => {
-            answerContent += `\n\nSource ${index + 1}:`
-            if (source.metadata?.source) {
-              answerContent += `\n  Source: ${source.metadata.source}`
-            }
-            if (source.metadata?.headings) {
-              answerContent += `\n  Section: ${source.metadata.headings.join(", ")}`
-            }
-            answerContent += `\n  Preview: ${source.content.substring(0, 200)}${source.content.length > 200 ? "..." : ""}`
-          })
-        }
-        
+        // Store answer and sources separately
         // Use addMessage hook instead of addMessageToChat directly
         // Pass chatId directly to ensure message is added to correct chat
         // This ensures state updates properly and triggers re-render
         addMessage({
           role: "assistant",
-          content: answerContent,
+          content: response.answer,
+          sources: response.sources,
         }, chatId)
         
         // Refresh the sessions to update the UI
@@ -271,6 +259,12 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
     // Capture the chatId at the time of sending to prevent stale closure issues
     const sendingChatId = chatId
     const userMessageContent = inputValue.trim()
+    
+    // Validate chatId is present (defensive check)
+    if (!sendingChatId) {
+      console.error("Cannot send message: chatId is required");
+      return;
+    }
 
     // Ensure currentChatId is set in the hook
     if (chatId) {
@@ -309,30 +303,14 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
       
       // Verify the chatId is still the same before adding the response
       if (chatId === sendingChatId && sendingChatId) {
-        // Format the answer with sources if available
-        let answerContent = response.answer
-        
-        // Add sources information if available
-        if (response.sources && response.sources.length > 0) {
-          answerContent += "\n\n--- Sources ---"
-          response.sources.forEach((source, index) => {
-            answerContent += `\n\nSource ${index + 1}:`
-            if (source.metadata?.source) {
-              answerContent += `\n  Source: ${source.metadata.source}`
-            }
-            if (source.metadata?.headings) {
-              answerContent += `\n  Section: ${source.metadata.headings.join(", ")}`
-            }
-            answerContent += `\n  Preview: ${source.content.substring(0, 200)}${source.content.length > 200 ? "..." : ""}`
-          })
-        }
-        
+        // Store answer and sources separately
         // Use addMessage hook instead of addMessageToChat directly
         // Pass chatId directly to ensure message is added to correct chat
         // This ensures state updates properly and triggers re-render
         addMessage({
           role: "assistant",
-          content: answerContent,
+          content: response.answer,
+          sources: response.sources,
         }, sendingChatId)
         
         // Refresh the sessions to update the UI
@@ -399,26 +377,8 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
       // Call the API to get the answer with conversation_id and turn_index
       const response = await chat(userMessageContent, sendingChatId, turnIndex)
 
-      // Format the answer with sources if available
-      let answerContent = response.answer
-
-      // Add sources information if available
-      if (response.sources && response.sources.length > 0) {
-        answerContent += "\n\n--- Sources ---"
-        response.sources.forEach((source, index) => {
-          answerContent += `\n\nSource ${index + 1}:`
-          if (source.metadata?.source) {
-            answerContent += `\n  Source: ${source.metadata.source}`
-          }
-          if (source.metadata?.headings) {
-            answerContent += `\n  Section: ${source.metadata.headings.join(", ")}`
-          }
-          answerContent += `\n  Preview: ${source.content.substring(0, 200)}${source.content.length > 200 ? "..." : ""}`
-        })
-      }
-
       // Replace the error message with the successful response
-      // We'll update the message content directly in the chat session
+      // We'll update the message content and sources directly in the chat session
       const sessions = getChatSessions()
       const sessionIndex = sessions.findIndex((s) => s.id === sendingChatId)
       if (sessionIndex !== -1) {
@@ -428,7 +388,8 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
         if (messageIndex !== -1) {
           sessions[sessionIndex].messages[messageIndex] = {
             ...sessions[sessionIndex].messages[messageIndex],
-            content: answerContent,
+            content: response.answer,
+            sources: response.sources,
           }
           sessions[sessionIndex].updatedAt = Date.now()
           saveChatSessions(sessions)
@@ -496,28 +457,13 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
                           : "bg-white text-gray-800 rounded-lg px-4 py-2 border border-gray-200 break-words"}
                       >
                         <div className="text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere">
-                          {message.content.split('\n').map((line, idx) => {
-                            // Format source paths to be more readable
-                            if (line.includes('Source:') && line.length > 80) {
-                              const parts = line.split('Source:')
-                              if (parts.length === 2) {
-                                const path = parts[1].trim()
-                                const fileName = path.split('/').pop() || path
-                                return (
-                                  <div key={idx} className="break-words">
-                                    {parts[0]}Source: <span className="font-mono text-xs break-all">{fileName}</span>
-                                  </div>
-                                )
-                              }
-                            }
-                            return (
-                              <div key={idx} className="break-words overflow-wrap-anywhere">
-                                {line}
-                              </div>
-                            )
-                          })}
+                          {message.content}
                         </div>
                       </div>
+                      {/* Sources display for assistant messages */}
+                      {!isError && message.role === "assistant" && message.sources && message.sources.length > 0 && (
+                        <SourceDisplay sources={message.sources} />
+                      )}
                       {/* Retry button for error messages */}
                       {isError && message.role === "assistant" && (
                         <div className="flex justify-start">

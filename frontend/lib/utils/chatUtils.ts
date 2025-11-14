@@ -1,3 +1,5 @@
+import type { SourceInfo } from "@/lib/api/client"
+
 export interface UploadedFile {
   id: string
   name: string
@@ -20,6 +22,7 @@ export interface Message {
   role: "user" | "assistant"
   content: string
   timestamp: number
+  sources?: SourceInfo[]
 }
 
 const CHAT_STORAGE_KEY = "rag_chat_sessions"

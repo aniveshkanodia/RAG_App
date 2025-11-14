@@ -54,7 +54,7 @@ export async function checkServerHealth(): Promise<boolean> {
  * Sends a chat question to the backend and returns the answer.
  * 
  * @param question - The user's question
- * @param conversationId - Optional conversation ID to track multi-turn conversations
+ * @param conversationId - Required conversation ID to track multi-turn conversations
  * @param turnIndex - Optional turn index within the conversation (0, 1, 2, ...)
  * @returns Promise resolving to the chat response with answer and sources
  * @throws Error if the request fails
@@ -68,12 +68,19 @@ export async function chat(
     throw new Error("Question cannot be empty");
   }
 
+  // Validate conversationId is provided
+  if (!conversationId) {
+    throw new Error("Conversation ID is required");
+  }
+
   try {
-    const body: any = { question: question.trim() };
-    if (conversationId) {
-      body.conversation_id = conversationId;
-    }
-    if (turnIndex !== undefined) {
+    const body: any = { 
+      question: question.trim(),
+      conversation_id: conversationId  // Always include since we validated it exists
+    };
+    
+    // Always include turn_index if provided
+    if (turnIndex !== undefined && turnIndex !== null) {
       body.turn_index = turnIndex;
     }
 
