@@ -77,19 +77,17 @@ def filter_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     Returns:
         Filtered list of records
     """
-    filtered = records
-    
     # Filter by chunking strategy if specified
     if FILTER_STRATEGY is not None:
-        filtered = [r for r in filtered if r.get('chunking_strategy') == FILTER_STRATEGY]
-        print(f"Filtered to {len(filtered)} records with strategy '{FILTER_STRATEGY}'")
+        records = [r for r in records if r.get('chunking_strategy') == FILTER_STRATEGY]
+        print(f"Filtered to {len(records)} records with strategy '{FILTER_STRATEGY}'")
     
     # Limit to MAX_RECORDS if specified
     if MAX_RECORDS is not None and MAX_RECORDS > 0:
-        filtered = filtered[:MAX_RECORDS]
+        records = records[:MAX_RECORDS]
         print(f"Limited to first {MAX_RECORDS} records")
     
-    return filtered
+    return records
 
 
 def create_test_cases(records: List[Dict[str, Any]]) -> List[LLMTestCase]:
@@ -101,28 +99,14 @@ def create_test_cases(records: List[Dict[str, Any]]) -> List[LLMTestCase]:
     Returns:
         List of LLMTestCase objects
     """
-    test_cases = []
-    for record in records:
-        test_case = LLMTestCase(
+    return [
+        LLMTestCase(
             input=record.get('user_query', ''),
             actual_output=record.get('answer', ''),
             retrieval_context=record.get('contexts', [])
         )
-        test_cases.append(test_case)
-    return test_cases
-
-
-def get_ollama_model():
-    """Get configured Ollama model instance.
-    
-    Returns:
-        OllamaModel instance configured with qwen3:0.6b
-    """
-    return OllamaModel(
-        model=OLLAMA_MODEL,
-        base_url=OLLAMA_BASE_URL,
-        temperature=0
-    )
+        for record in records
+    ]
 
 
 def evaluate_test_cases(test_cases: List[LLMTestCase]) -> Dict[str, List[float]]:
@@ -134,8 +118,15 @@ def evaluate_test_cases(test_cases: List[LLMTestCase]) -> Dict[str, List[float]]
     Returns:
         Dictionary mapping metric names to lists of scores
     """
-    # Initialize Ollama model
-    ollama_model = get_ollama_model()
+    # Initialize Ollama model once for reuse
+    ollama_model = OllamaModel(
+        model=OLLAMA_MODEL,
+        base_url=OLLAMA_BASE_URL,
+        temperature=0
+    )
+    
+    # Create metric instances once per metric type (reusable)
+    metrics = {cls.__name__: cls(model=ollama_model) for cls in METRIC_CLASSES}
     
     # Store scores for each metric
     metric_scores = defaultdict(list)
@@ -146,16 +137,14 @@ def evaluate_test_cases(test_cases: List[LLMTestCase]) -> Dict[str, List[float]]
         if (i + 1) % 10 == 0:
             print(f"  Processed {i + 1}/{len(test_cases)} test cases...")
         
-        for metric_class in METRIC_CLASSES:
+        for metric_name, metric in metrics.items():
             try:
-                # Create a new metric instance for each test case with Ollama model
-                metric = metric_class(model=ollama_model)
                 metric.measure(test_case)
                 score = metric.score
                 if score is not None:
-                    metric_scores[metric.__class__.__name__].append(score)
+                    metric_scores[metric_name].append(score)
             except Exception as e:
-                print(f"  Warning: Failed to evaluate {metric_class.__name__} for test case {i+1}: {e}")
+                print(f"  Warning: Failed to evaluate {metric_name} for test case {i+1}: {e}")
                 continue
     
     print(f"Completed evaluation of {len(test_cases)} test cases\n")
@@ -191,10 +180,7 @@ def print_summary(metric_scores: Dict[str, List[float]], num_records: int, strat
         strategy_name: Optional strategy name to include in header
     """
     print(f"\n{'='*60}")
-    if strategy_name:
-        print(f"Strategy: {strategy_name}")
-    else:
-        print(f"Evaluation Summary")
+    print(f"Strategy: {strategy_name}" if strategy_name else "Evaluation Summary")
     print(f"{'='*60}")
     print(f"Total records evaluated: {num_records}\n")
     
@@ -216,6 +202,18 @@ def print_summary(metric_scores: Dict[str, List[float]], num_records: int, strat
         print()
 
 
+def evaluate_records(records: List[Dict[str, Any]], strategy_name: str = None):
+    """Evaluate records and print summary.
+    
+    Args:
+        records: List of log records
+        strategy_name: Optional strategy name for summary header
+    """
+    test_cases = create_test_cases(records)
+    metric_scores = evaluate_test_cases(test_cases)
+    print_summary(metric_scores, len(records), strategy_name=strategy_name)
+
+
 def evaluate_by_strategy(records: List[Dict[str, Any]]):
     """Evaluate records grouped by chunking strategy.
     
@@ -225,21 +223,14 @@ def evaluate_by_strategy(records: List[Dict[str, Any]]):
     # Group records by chunking strategy
     strategy_groups = defaultdict(list)
     for record in records:
-        strategy = record.get('chunking_strategy', 'unknown')
-        strategy_groups[strategy].append(record)
+        strategy_groups[record.get('chunking_strategy', 'unknown')].append(record)
     
-    print(f"\nFound {len(strategy_groups)} chunking strategies: {list(strategy_groups.keys())}\n")
+    strategies = list(strategy_groups.keys())
+    print(f"\nFound {len(strategies)} chunking strategies: {strategies}\n")
     
     # Evaluate each strategy separately
     for strategy, strategy_records in strategy_groups.items():
-        # Create test cases for this strategy
-        test_cases = create_test_cases(strategy_records)
-        
-        # Evaluate
-        metric_scores = evaluate_test_cases(test_cases)
-        
-        # Print summary for this strategy (reusing print_summary function)
-        print_summary(metric_scores, len(strategy_records), strategy_name=strategy)
+        evaluate_records(strategy_records, strategy_name=strategy)
 
 
 def main():
@@ -269,16 +260,14 @@ def main():
     print(f"Evaluating {len(filtered_records)} records\n")
     
     # Check if we should group by strategy
-    strategies = set(r.get('chunking_strategy') for r in filtered_records)
+    strategies = {r.get('chunking_strategy') for r in filtered_records}
     
     if len(strategies) > 1 and FILTER_STRATEGY is None:
         # Multiple strategies - evaluate separately
         evaluate_by_strategy(filtered_records)
     else:
         # Single strategy or filtered - evaluate all together
-        test_cases = create_test_cases(filtered_records)
-        metric_scores = evaluate_test_cases(test_cases)
-        print_summary(metric_scores, len(filtered_records))
+        evaluate_records(filtered_records)
     
     print("Evaluation complete!")
 
