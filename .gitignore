@@ -36,3 +36,6 @@ frontend/.env*.local
 # Documentation files
 frontend-backend_integration_plan.md
 USER_RULES.md
+
+#Test Notebooks
+TestNotebooks
