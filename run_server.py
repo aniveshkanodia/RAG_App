@@ -6,8 +6,6 @@ This script ensures proper Python path setup and runs the FastAPI application.
 
 Usage:
     python run_server.py
-    OR
-    uvicorn api_server:app --reload
 """
 
 import sys

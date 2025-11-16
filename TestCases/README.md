@@ -64,9 +64,7 @@ Before running the tests, ensure:
 
 Make sure the server is running:
 ```bash
-fastapi dev api_server.py
-# or
-uvicorn api_server:app --reload --port 8000
+python run_server.py
 ```
 
 Then run the test script:
@@ -84,7 +82,7 @@ Then run the test script:
    ```
 
 **Manual Tests:**
-1. Start backend: `fastapi dev api_server.py`
+1. Start backend: `python run_server.py`
 2. Start frontend: `cd frontend && npm run dev`
 3. Open browser to `http://localhost:3000`
 4. Follow the checklist in `phase3_manual_tests.md`

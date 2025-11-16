@@ -4,7 +4,7 @@ This document provides a manual testing checklist for Phase 3 frontend features 
 
 ## Prerequisites
 
-1. Backend server running: `fastapi dev api_server.py` (on http://localhost:8000)
+1. Backend server running: `python run_server.py` (on http://localhost:8000)
 2. Frontend server running: `cd frontend && npm run dev` (on http://localhost:3000)
 3. Browser open to http://localhost:3000
 

@@ -86,7 +86,7 @@ def main():
             print(f"⚠️  Server returned status {response.status_code}")
     except requests.exceptions.RequestException:
         print("❌ Server is not running. Please start it first:")
-        print("   python -m uvicorn api_server:app --reload --port 8000")
+        print("   python run_server.py")
         return
     
     # Test 1: Request without conversation_id (should generate one)

@@ -7,7 +7,6 @@ This module should be run as a package module from the project root:
     
 Or use the entry point at the root:
     python run_server.py
-    uvicorn api_server:app --reload
 """
 
 # When run directly (python backend/main.py), add project root to path BEFORE imports
@@ -74,7 +73,7 @@ if __name__ == "__main__":
     import uvicorn
     # Run the app directly (app is already imported above)
     # Note: For reload to work properly, use: python -m backend.main
-    # Or use the root-level entry points: python run_server.py or uvicorn api_server:app
+    # Or use the root-level entry point: python run_server.py
     uvicorn.run(
         app,
         host=API_HOST,
