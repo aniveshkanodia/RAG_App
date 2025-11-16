@@ -113,8 +113,7 @@ def run_pipeline(question: str, conversation_id: Optional[str] = None) -> Dict[s
     Args:
         question: User question
         conversation_id: Optional conversation ID to filter documents by chat session.
-                        If provided, only retrieves documents with matching conversation_id
-                        or documents without conversation_id (legacy files for backward compatibility).
+                        If provided, only retrieves documents with matching conversation_id.
         
     Returns:
         Dictionary with 'answer', 'context', and 'input' keys
@@ -127,14 +126,20 @@ def run_pipeline(question: str, conversation_id: Optional[str] = None) -> Dict[s
         raise RuntimeError("Vector database not initialized")
     
     # Create retriever (no database-level filtering to avoid API conflicts)
+    # We'll filter in Python after retrieval to ensure conversation isolation
     retriever = vectordb.as_retriever(
         search_type="similarity",
         search_kwargs={"k": TOP_K * 2},  # Retrieve more to account for filtering
     )
     
-    # Step 1: Wrap document retrieval with optional post-retrieval filtering
+    # Step 1: Wrap document retrieval with conversation isolation
     def retrieve_docs_with_filter(input_dict):
-        """Retrieve documents and filter by conversation_id if needed."""
+        """Retrieve documents and filter by conversation_id if needed.
+        
+        When conversation_id is provided, only returns documents with matching
+        conversation_id. Never falls back to unfiltered documents to maintain
+        strict conversation isolation.
+        """
         docs = retriever.invoke(input_dict["input"])
         
         # Filter by conversation_id in Python if provided
@@ -143,12 +148,13 @@ def run_pipeline(question: str, conversation_id: Optional[str] = None) -> Dict[s
                 doc for doc in docs 
                 if doc.metadata.get("conversation_id") == conversation_id
             ]
-            # If we filtered out too many, take what we have (at least we tried)
+            # Return only filtered results, even if empty (maintains isolation)
             return {
-                "docs": filtered_docs[:TOP_K] if filtered_docs else docs[:TOP_K],
+                "docs": filtered_docs[:TOP_K],
                 "question": input_dict["input"]
             }
         else:
+            # No filtering - return all documents
             return {
                 "docs": docs[:TOP_K],
                 "question": input_dict["input"]
@@ -182,7 +188,7 @@ def run_pipeline(question: str, conversation_id: Optional[str] = None) -> Dict[s
     
     llm_step = RunnableLambda(call_llm_and_format)
     
-    # Build the complete pipeline dynamically
+    # Build the complete pipeline
     dynamic_rag_chain = retrieve_docs | prompt_step | llm_step
     
     # Invoke the chain
