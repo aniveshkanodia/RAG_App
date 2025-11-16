@@ -41,14 +41,23 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
   }, [chatId, setCurrentChat])
   
   // Load uploaded files for current chat (client-side only to avoid hydration issues)
+  // Sync with both currentChat from hook and localStorage to ensure consistency
   useEffect(() => {
     if (chatId && typeof window !== "undefined") {
-      const files = getFiles(chatId)
+      // First try to get from currentChat (hook state) - most up-to-date
+      const filesFromHook = currentChat?.uploadedFiles || []
+      
+      // Also check localStorage as fallback to ensure we have the latest
+      const filesFromStorage = getFiles(chatId)
+      
+      // Use the longer array (most recent) to handle race conditions
+      const files = filesFromHook.length >= filesFromStorage.length ? filesFromHook : filesFromStorage
+      
       setUploadedFiles(files)
     } else {
       setUploadedFiles([])
     }
-  }, [chatId, getFiles, currentChat?.uploadedFiles])
+  }, [chatId, currentChat?.uploadedFiles])
   
   // Auto-scroll to bottom when messages change
   useLayoutEffect(() => {
@@ -92,7 +101,6 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
       const response = await uploadFile(file, chatId)
       
       // Update file status to "success" in chat session
-      refreshSessions()
       const sessions = getChatSessions()
       const sessionIndex = sessions.findIndex((s) => s.id === chatId)
       if (sessionIndex !== -1 && sessions[sessionIndex].uploadedFiles) {
@@ -103,11 +111,20 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
           lastFile.status = "success"
           sessions[sessionIndex].updatedAt = Date.now()
           saveChatSessions(sessions)
-          refreshSessions()
-          // Update local state
+          // Update local state immediately - useEffect will also sync but this ensures UI updates
           setUploadedFiles([...files])
+        } else {
+          // If we couldn't find the uploading file, refresh from storage
+          const updatedFiles = getFiles(chatId)
+          setUploadedFiles(updatedFiles)
         }
+      } else {
+        // Session not found or no files - refresh from storage
+        const updatedFiles = getFiles(chatId)
+        setUploadedFiles(updatedFiles)
       }
+      // Refresh sessions once after all updates
+      refreshSessions()
       
       // Show success message
       setUploadStatus({
@@ -121,7 +138,6 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
       }, 5000)
     } catch (error) {
       // Update file status to "error" in chat session
-      refreshSessions()
       const sessions = getChatSessions()
       const sessionIndex = sessions.findIndex((s) => s.id === chatId)
       if (sessionIndex !== -1 && sessions[sessionIndex].uploadedFiles) {
@@ -132,11 +148,20 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
           lastFile.status = "error"
           sessions[sessionIndex].updatedAt = Date.now()
           saveChatSessions(sessions)
-          refreshSessions()
-          // Update local state
+          // Update local state immediately - useEffect will also sync but this ensures UI updates
           setUploadedFiles([...files])
+        } else {
+          // If we couldn't find the uploading file, refresh from storage
+          const updatedFiles = getFiles(chatId)
+          setUploadedFiles(updatedFiles)
         }
+      } else {
+        // Session not found or no files - refresh from storage
+        const updatedFiles = getFiles(chatId)
+        setUploadedFiles(updatedFiles)
       }
+      // Refresh sessions once after all updates
+      refreshSessions()
       
       // Show error message
       const errorMessage = error instanceof Error ? error.message : "Failed to upload file. Please try again."
@@ -202,7 +227,6 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
     // Use setTimeout to ensure state is updated and chat is ready
     setTimeout(async () => {
       if (!chatId) {
-        console.error("Cannot send initial message: chatId is required");
         return;
       }
       
@@ -222,9 +246,6 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
         content: userMessageContent,
       }, chatId)
       
-      // Force refresh to ensure UI updates
-      refreshSessions()
-      
       // Set loading state
       setIsLoading(true)
       
@@ -242,13 +263,9 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
           sources: response.sources,
         }, chatId)
         
-        // Refresh the sessions to update the UI
-        refreshSessions()
-        
         // Message successfully processed - already marked in processedSet above
       } catch (error) {
         // Handle errors
-        console.error("Error getting response:", error)
         
         // Use addMessage hook instead of addMessageToChat directly
         // Pass chatId directly to ensure message is added to correct chat
@@ -256,7 +273,6 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
           role: "assistant",
           content: `Error: ${error instanceof Error ? error.message : "We're having trouble reaching the server — please try again later."}`,
         }, chatId)
-        refreshSessions()
         
         // On error, remove from processed set so user can retry explicitly
         // But keep it marked as processed for initialMessage to prevent auto-retry
@@ -277,7 +293,6 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
     
     // Validate chatId is present (defensive check)
     if (!sendingChatId) {
-      console.error("Cannot send message: chatId is required");
       return;
     }
 
@@ -306,9 +321,6 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
       content: userMessageContent,
     }, chatId)
 
-    // Force refresh to ensure UI updates
-    refreshSessions()
-
     // Set loading state
     setIsLoading(true)
 
@@ -327,13 +339,9 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
           content: response.answer,
           sources: response.sources,
         }, sendingChatId)
-        
-        // Refresh the sessions to update the UI
-        refreshSessions()
       }
     } catch (error) {
       // Handle errors
-      console.error("Error getting response:", error)
       
       // Verify the chatId is still the same before adding the error message
       if (chatId === sendingChatId && sendingChatId) {
@@ -343,7 +351,6 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
           role: "assistant",
           content: `Error: ${error instanceof Error ? error.message : "We're having trouble reaching the server — please try again later."}`,
         }, sendingChatId)
-        refreshSessions()
       }
     } finally {
       // Clear loading state
@@ -408,11 +415,11 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
           }
           sessions[sessionIndex].updatedAt = Date.now()
           saveChatSessions(sessions)
-          refreshSessions()
         }
       }
+      refreshSessions()
     } catch (error) {
-      console.error("Error retrying message:", error)
+      // Error handling
       // Update the error message with the new error
       const sessions = getChatSessions()
       const sessionIndex = sessions.findIndex((s) => s.id === sendingChatId)
@@ -427,9 +434,9 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
           }
           sessions[sessionIndex].updatedAt = Date.now()
           saveChatSessions(sessions)
-          refreshSessions()
         }
       }
+      refreshSessions()
     } finally {
       setIsLoading(false)
     }

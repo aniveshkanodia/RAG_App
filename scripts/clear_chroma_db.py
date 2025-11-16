@@ -25,20 +25,18 @@ CHROMA_DB_PATH = "./db/chroma_db"
 def clear_collection():
     """Clear the ChromaDB collection programmatically."""
     try:
-        from langchain_ollama import OllamaEmbeddings
-        from langchain_chroma import Chroma
+        # Import from new backend structure
+        from backend.core.embeddings import get_embeddings
+        from backend.core.vectorstore import get_vectorstore
+        from backend.core.config import VECTOR_DB_COLLECTION_NAME
         
         print("Initializing ChromaDB connection...")
         
         # Initialize embeddings (needed for ChromaDB)
-        embeddings = OllamaEmbeddings(model="qwen3-embedding:0.6b")
+        embeddings = get_embeddings()
         
         # Connect to existing ChromaDB instance
-        vectordb = Chroma(
-            collection_name="documents",
-            embedding_function=embeddings,
-            persist_directory=CHROMA_DB_PATH,
-        )
+        vectordb = get_vectorstore()
         
         print("Deleting collection 'documents'...")
         
