@@ -90,6 +90,7 @@ async def handle_chat(request: ChatRequest) -> ChatResponse:
             logger.error(f"Failed to log RAG turn: {log_error}", exc_info=True)
         
         # Format sources with validation
+        logger.info(f"Formatting sources from {len(context_docs)} context documents")
         sources = []
         for doc in context_docs:
             try:
@@ -123,6 +124,7 @@ async def handle_chat(request: ChatRequest) -> ChatResponse:
                 logger.error(f"Error creating source from document: {source_error}", exc_info=True)
                 continue
         
+        logger.info(f"Returning response with {len(sources) if sources else 0} sources")
         return ChatResponse(
             answer=answer,
             sources=sources if sources else None

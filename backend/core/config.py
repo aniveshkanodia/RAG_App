@@ -62,3 +62,18 @@ VECTOR_DB_PATH = "./db/chroma_db"
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 100
 
+# Supabase configuration for document registry
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+SUPABASE_PROJECT_ID = "tsadnlegfpcnnrrnxiam"
+
+# Supabase credentials must be provided via environment variables
+# Never hardcode authentication tokens in source code
+# Validation is deferred to get_supabase_client() to allow graceful degradation
+# if Supabase is unavailable (the app can still function without the registry)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+

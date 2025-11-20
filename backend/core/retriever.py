@@ -18,14 +18,18 @@ def retrieve_documents(
 ) -> List[Document]:
     """Retrieve documents with optional conversation filtering.
     
-    When conversation_id is provided, only returns documents with matching
-    conversation_id. Never falls back to unfiltered documents to maintain
-    strict conversation isolation.
+    When conversation_id is provided, returns documents that either:
+    - Match the conversation_id (conversation-scoped documents)
+    - Have no conversation_id (global documents uploaded from home screen)
+    
+    This allows global documents to be accessible in all conversations while
+    maintaining conversation isolation for conversation-scoped documents.
     
     Args:
         question: User question for retrieval
         conversation_id: Optional conversation ID to filter documents by chat session.
-                        If provided, only retrieves documents with matching conversation_id.
+                        If provided, retrieves documents with matching conversation_id
+                        or documents without conversation_id (global documents).
         k: Number of documents to retrieve (defaults to TOP_K from config)
         
     Returns:
@@ -62,13 +66,26 @@ def retrieve_documents(
     
     # Filter by conversation_id in Python if provided
     if conversation_id is not None:
+        logger.info(f"Filtering documents by conversation_id: {conversation_id}")
+        logger.info(f"Total valid docs before filtering: {len(valid_docs)}")
+        
+        # Debug: Log conversation_ids found in documents
+        found_conversation_ids = [doc.metadata.get("conversation_id") for doc in valid_docs if hasattr(doc, 'metadata')]
+        logger.info(f"Conversation IDs found in documents: {set(found_conversation_ids)}")
+        
+        # Include documents that match the conversation_id OR have no conversation_id (global documents)
+        # This allows documents uploaded from home screen (no conversation_id) to be accessible
+        # while still maintaining conversation isolation for conversation-scoped documents
         filtered_docs = [
             doc for doc in valid_docs 
-            if doc.metadata.get("conversation_id") == conversation_id
+            if doc.metadata.get("conversation_id") == conversation_id or doc.metadata.get("conversation_id") is None
         ]
-        # Return only filtered results, even if empty (maintains isolation)
+        logger.info(f"Documents after filtering (matching conversation_id or global): {len(filtered_docs)}")
+        
+        # Return filtered results
         return filtered_docs[:k]
     else:
         # No filtering - return all documents
+        logger.info(f"No conversation_id provided, returning all {len(valid_docs)} documents")
         return valid_docs[:k]
 

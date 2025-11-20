@@ -36,18 +36,22 @@ def run_rag_pipeline(question: str, conversation_id: Optional[str] = None) -> Di
     """
     # Step 1: Retrieve documents with optional conversation filtering
     # retrieve_documents guarantees it returns a list (never None)
+    logger.info(f"Retrieving documents for question: '{question[:50]}...' with conversation_id: {conversation_id}")
     docs = retrieve_documents(question, conversation_id=conversation_id)
+    logger.info(f"Retrieved {len(docs)} documents")
     
     # Step 2: Format context from retrieved documents
     # Documents are already validated in retrieve_documents, but ensure page_content exists
     valid_docs = [doc for doc in docs if doc.page_content]
+    logger.info(f"Valid documents with page_content: {len(valid_docs)}")
     
     # Build context string from valid documents
     if valid_docs:
         context = "\n\n".join(doc.page_content for doc in valid_docs)
+        logger.info(f"Built context string of length {len(context)} characters from {len(valid_docs)} documents")
     else:
         context = ""
-        logger.warning(f"No valid documents found - context will be empty")
+        logger.warning(f"No valid documents found - context will be empty. Question: '{question[:50]}...'")
     
     # Step 3: Generate answer using LLM
     answer = generate_answer(context, question, valid_docs)
