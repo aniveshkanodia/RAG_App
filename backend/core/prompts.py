@@ -2,21 +2,22 @@
 Prompt template management for RAG pipeline.
 """
 
-from langchain_core.prompts import PromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
+from backend.core.config import SYSTEM_PROMPT
 
-# RAG prompt template
-RAG_PROMPT_TEMPLATE = PromptTemplate.from_template(
-    "Context information is below.\n"
-    "---------------------\n"
-    "{context}\n"
-    "---------------------\n"
-    "Given the context information and not prior knowledge, answer the query.\n"
-    "Query: {input}\n"
-    "Answer:\n"
-)
+# RAG prompt template with system message
+RAG_PROMPT_TEMPLATE = ChatPromptTemplate.from_messages([
+    ("system", SYSTEM_PROMPT),
+    ("human", 
+     "Context:\n"
+     "---------------------\n"
+     "{context}\n"
+     "---------------------\n"
+     "Question: {input}")
+])
 
 
-def format_rag_prompt(context: str, question: str) -> str:
+def format_rag_prompt(context: str, question: str):
     """Format RAG prompt with context and question.
     
     Args:
@@ -24,7 +25,7 @@ def format_rag_prompt(context: str, question: str) -> str:
         question: User's question
         
     Returns:
-        Formatted prompt string ready for LLM
+        Formatted prompt messages ready for LLM
     """
-    return RAG_PROMPT_TEMPLATE.format(context=context, input=question)
+    return RAG_PROMPT_TEMPLATE.format_messages(context=context, input=question)
 
