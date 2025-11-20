@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState, useEffect, useLayoutEffect } from "react"
-import { Plus, Send, RotateCw } from "lucide-react"
+import { Plus, Send, RotateCw, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useChatSessions } from "@/lib/hooks/useChatSessions"
@@ -26,6 +26,7 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' })
   const [isUploading, setIsUploading] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+  const [isFileSidebarOpen, setIsFileSidebarOpen] = useState(true)
   const { currentChat, addMessage, refreshSessions, setCurrentChat, addFile, getFiles, removeFile } = useChatSessions()
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -60,6 +61,28 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
       setUploadedFiles([])
     }
   }, [chatId, currentChat?.uploadedFiles])
+
+  // Load file sidebar open state from localStorage when chatId changes
+  useEffect(() => {
+    if (chatId && typeof window !== "undefined") {
+      const savedState = localStorage.getItem(`fileSidebarOpen_${chatId}`)
+      if (savedState !== null) {
+        setIsFileSidebarOpen(savedState === "true")
+      } else {
+        // Default to open if no saved state exists
+        setIsFileSidebarOpen(true)
+      }
+    } else {
+      setIsFileSidebarOpen(true)
+    }
+  }, [chatId])
+
+  // Save file sidebar open state to localStorage whenever it changes
+  useEffect(() => {
+    if (chatId && typeof window !== "undefined") {
+      localStorage.setItem(`fileSidebarOpen_${chatId}`, String(isFileSidebarOpen))
+    }
+  }, [chatId, isFileSidebarOpen])
   
   // Auto-scroll to bottom when messages change
   useLayoutEffect(() => {
@@ -127,6 +150,9 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
       }
       // Refresh sessions once after all updates
       refreshSessions()
+      
+      // Auto-open sidebar when file is uploaded
+      setIsFileSidebarOpen(true)
       
       // Show success message
       setUploadStatus({
@@ -613,7 +639,7 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
       </div>
 
       {/* File Sidebar - Right Side */}
-      {chatId && uploadedFiles.length > 0 && (
+      {chatId && uploadedFiles.length > 0 && isFileSidebarOpen && (
         <FileSidebar 
           files={uploadedFiles} 
           onRemoveFile={(fileId) => {
@@ -623,8 +649,31 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
               const updatedFiles = getFiles(chatId)
               setUploadedFiles(updatedFiles)
             }
-          }} 
+          }}
+          onClose={() => setIsFileSidebarOpen(false)}
         />
+      )}
+
+      {/* Floating Toggle Button - Show when sidebar is closed but files exist */}
+      {chatId && uploadedFiles.length > 0 && !isFileSidebarOpen && (
+        <button
+          onClick={() => setIsFileSidebarOpen(true)}
+          className="fixed right-4 top-1/2 -translate-y-1/2 z-50 w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group"
+          aria-label="Show uploaded files"
+        >
+          <FileText className="h-5 w-5" />
+          {/* File count badge */}
+          {uploadedFiles.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-semibold flex items-center justify-center">
+              {uploadedFiles.length}
+            </span>
+          )}
+          {/* Tooltip */}
+          <div className="absolute right-full mr-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+            Show Uploaded Files
+            <div className="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-gray-800"></div>
+          </div>
+        </button>
       )}
     </div>
   )
