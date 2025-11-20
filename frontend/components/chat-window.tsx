@@ -10,6 +10,8 @@ import { getChatSessions, saveChatSessions } from "@/lib/utils/chatUtils"
 import { chat, uploadFile } from "@/lib/api/client"
 import { FileSidebar } from "./file-sidebar"
 import { SourceDisplay } from "./source-display"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 interface ChatWindowProps {
   chatId: string | null
@@ -477,8 +479,16 @@ export function ChatWindow({ chatId, initialMessage }: ChatWindowProps) {
                           ? "bg-red-50 text-red-800 rounded-lg px-4 py-2 border border-red-200 break-words"
                           : "bg-white text-gray-800 rounded-lg px-4 py-2 border border-gray-200 break-words"}
                       >
-                        <div className="text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere">
-                          {message.content}
+                        <div className={`text-sm break-words overflow-wrap-anywhere prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0 prose-strong:font-bold ${
+                          message.role === "user"
+                            ? "prose-invert prose-p:text-white prose-strong:text-white prose-ul:text-white prose-ol:text-white prose-li:text-white"
+                            : isError
+                            ? "prose-p:text-red-800 prose-strong:text-red-900 prose-ul:text-red-800 prose-ol:text-red-800 prose-li:text-red-800"
+                            : "prose-p:text-gray-800 prose-strong:text-gray-900 prose-ul:text-gray-800 prose-ol:text-gray-800 prose-li:text-gray-800"
+                        }`}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {message.content}
+                          </ReactMarkdown>
                         </div>
                       </div>
                       {/* Sources display for assistant messages */}
