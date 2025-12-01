@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Standalone script to clear all data from ChromaDB.
+Standalone script to clear all data from ChromaDB and optionally Supabase.
 
 This script:
 1. Resets the global vectorstore cache
 2. Deletes the existing ChromaDB collection
-3. Optionally deletes the entire database directory
+3. Optionally (with --full): deletes the entire ChromaDB directory AND clears Supabase registry
 
 Note: The collection and directory are NOT recreated. They will be automatically
 created by get_vectorstore() when needed.
 
 Usage:
     python clear_chroma_db.py           # Clear cache and collection only
-    python clear_chroma_db.py --full    # Also delete entire database directory
+    python clear_chroma_db.py --full    # Also delete database directory and clear Supabase
 """
 
 import os
@@ -20,6 +20,16 @@ import sys
 import shutil
 import argparse
 from pathlib import Path
+from dotenv import load_dotenv  # Import load_dotenv
+
+# Ensure project root is in Python path before importing backend modules
+# Script is in scripts/ directory, so project root is parent.parent
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+# Load environment variables from .env file
+load_dotenv(project_root / ".env")
 
 
 def clear_cache():
@@ -31,6 +41,14 @@ def clear_cache():
         reset_vectorstore()
         print("✓ Cache cleared successfully")
         return True
+    except ModuleNotFoundError as e:
+        if "backend" in str(e):
+            print(f"❌ Error: Cannot find backend module: {e}")
+            print("Make sure you're running this script from the project root or that the project root is in PYTHONPATH")
+        else:
+            print(f"❌ Error: Missing required package: {e}")
+            print("Please install required packages: pip install langchain-chroma langchain-ollama")
+        return False
     except ImportError as e:
         print(f"❌ Error: Missing required package: {e}")
         print("Please install required packages: pip install langchain-chroma langchain-ollama")
@@ -68,6 +86,14 @@ def clear_collection():
                 raise
         return True
         
+    except ModuleNotFoundError as e:
+        if "backend" in str(e):
+            print(f"❌ Error: Cannot find backend module: {e}")
+            print("Make sure you're running this script from the project root or that the project root is in PYTHONPATH")
+        else:
+            print(f"❌ Error: Missing required package: {e}")
+            print("Please install required packages: pip install langchain-chroma langchain-ollama")
+        return False
     except ImportError as e:
         print(f"❌ Error: Missing required package: {e}")
         print("Please install required packages: pip install langchain-chroma langchain-ollama")
@@ -94,6 +120,13 @@ def delete_directory():
         # Note: Directory will be recreated automatically by get_vectorstore() when needed
         
         return True
+    except ModuleNotFoundError as e:
+        if "backend" in str(e):
+            print(f"❌ Error: Cannot find backend module: {e}")
+            print("Make sure you're running this script from the project root or that the project root is in PYTHONPATH")
+        else:
+            print(f"❌ Error: Missing required package: {e}")
+        return False
     except ImportError as e:
         print(f"❌ Error: Missing required package: {e}")
         return False
@@ -102,22 +135,84 @@ def delete_directory():
         return False
 
 
+def clear_supabase():
+    """Clear all documents from Supabase registry."""
+    try:
+        from backend.utils.document_registry import get_supabase_client
+        
+        # --- ADDED VALIDATION ---
+        url = os.getenv("SUPABASE_URL")
+        key = os.getenv("SUPABASE_ANON_KEY")  # Changed from SUPABASE_KEY to SUPABASE_ANON_KEY
+        
+        if not url:
+            print("❌ Error: SUPABASE_URL is not set in environment.")
+            return False
+        if not key:
+            print("❌ Error: SUPABASE_ANON_KEY is not set in environment.") # Update error message too
+            return False
+            
+        print(f"Connecting to Supabase at {url[:8]}...")  # Print partial URL to verify
+        # ------------------------
+
+        client = get_supabase_client()
+        
+        print("Deleting all documents from registry...")
+        # Delete all documents - use a filter that matches all rows
+        # (Supabase requires a filter for DELETE operations)
+        # Using .neq("content_hash", "") matches all rows where content_hash is not empty
+        # which should be all valid documents (content_hash is required)
+        result = client.table("documents").delete().neq("content_hash", "").execute()
+        
+        # Count deleted documents if available
+        # Supabase returns deleted rows in result.data
+        deleted_count = len(result.data) if result.data else 0
+        if deleted_count > 0:
+            print(f"✓ Deleted {deleted_count} document(s) from Supabase registry")
+        else:
+            # Could be empty table or result.data is None (some Supabase versions)
+            # Check if operation succeeded by checking for errors
+            print("✓ Supabase registry cleared (table was empty or all documents deleted)")
+        return True
+        
+    except ModuleNotFoundError as e:
+        if "backend" in str(e):
+            print(f"❌ Error: Cannot find backend module: {e}")
+            print("Make sure you're running this script from the project root or that the project root is in PYTHONPATH")
+        else:
+            print(f"❌ Error: Missing required package: {e}")
+        return False
+    except ImportError as e:
+        print(f"❌ Error: Missing required package: {e}")
+        return False
+    except RuntimeError as e:
+        error_msg = str(e).lower()
+        if "row-level security" in error_msg or "policy" in error_msg or "permission denied" in error_msg:
+            print(f"❌ Error: Access denied by Row Level Security policy: {e}")
+            print("Please ensure RLS policies allow DELETE operations for the anon role.")
+        else:
+            print(f"❌ Error: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ Error clearing Supabase: {e}")
+        return False
+
+
 def main():
     """Main function."""
     parser = argparse.ArgumentParser(
-        description="Clear ChromaDB data (cache, collection, and optionally directory)",
+        description="Clear ChromaDB data (cache, collection, and optionally directory and Supabase)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   python clear_chroma_db.py           # Clear cache and collection only (recommended)
-  python clear_chroma_db.py --full    # Also delete entire database directory
+  python clear_chroma_db.py --full    # Also delete database directory and clear Supabase
         """
     )
     
     parser.add_argument(
         "--full",
         action="store_true",
-        help="Also delete entire database directory (more thorough, but slower)"
+        help="Also delete entire database directory and clear Supabase registry (more thorough, but slower)"
     )
     
     parser.add_argument(
@@ -135,7 +230,7 @@ Examples:
     
     # Confirmation prompt
     if not args.force:
-        action = "clear cache, collection, and delete the database directory" if args.full else "clear cache and collection"
+        action = "clear cache, collection, delete the database directory, and clear Supabase registry" if args.full else "clear cache and collection"
         response = input(f"Are you sure you want to {action}? (yes/no): ").strip().lower()
         
         if response not in ["yes", "y"]:
@@ -161,14 +256,22 @@ Examples:
         if not delete_directory():
             success = False
         print()
+        
+        # Step 4: Clear Supabase registry (only with --full)
+        if not clear_supabase():
+            success = False
+        print()
     
     print("=" * 60)
     if success:
-        print("✓ ChromaDB cleared successfully!")
+        if args.full:
+            print("✓ ChromaDB and Supabase cleared successfully!")
+        else:
+            print("✓ ChromaDB cleared successfully!")
         print("Note: Collection and directory will be recreated automatically")
         print("      by get_vectorstore() when needed.")
     else:
-        print("❌ Failed to clear ChromaDB")
+        print("❌ Failed to clear data")
         sys.exit(1)
     print("=" * 60)
 
