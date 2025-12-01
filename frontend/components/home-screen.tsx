@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useRef, useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Plus, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -16,8 +16,27 @@ export function HomeScreen() {
   const [serverError, setServerError] = useState<string | null>(null)
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' })
   const [isUploading, setIsUploading] = useState(false)
+  const [pendingChatId, setPendingChatId] = useState<string | null>(null)
   const router = useRouter()
   const { createNewChat } = useChatSessions()
+
+  // Get or create a pending chat session for home screen actions
+  // This ensures all actions (upload, message) use the same conversation_id
+  const getOrCreatePendingChat = useCallback((): string => {
+    if (!pendingChatId) {
+      const newChat = createNewChat()
+      setPendingChatId(newChat.id)
+      return newChat.id
+    }
+    return pendingChatId
+  }, [pendingChatId, createNewChat])
+
+  // Cleanup pending session on unmount
+  useEffect(() => {
+    return () => {
+      setPendingChatId(null)
+    }
+  }, [])
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -29,19 +48,21 @@ export function HomeScreen() {
     setIsUploading(true)
 
     try {
-      // Upload the file
-      const response = await uploadFile(file)
+      // Get or create pending chat session to ensure conversation_id consistency
+      // This ensures the file is indexed with the same conversation_id that will be used for questions
+      const chatId = getOrCreatePendingChat()
       
-      // Show success message
-      setUploadStatus({
-        type: 'success',
-        message: `Successfully uploaded file ${file.name}.`
-      })
+      // Upload the file with conversation_id
+      const response = await uploadFile(file, chatId)
       
-      // Clear status after 5 seconds
-      setTimeout(() => {
-        setUploadStatus({ type: null, message: '' })
-      }, 5000)
+      // Navigate to chat page after successful upload
+      // This allows user to immediately ask questions about the uploaded file
+      router.push(`/chat?chatId=${chatId}`)
+      
+      // Clear pending session since we've navigated away
+      setPendingChatId(null)
+      
+      // Note: Success message not shown since we navigate away immediately
     } catch (error) {
       // Show error message
       const errorMessage = error instanceof Error ? error.message : "Failed to upload file. Please try again."
@@ -54,6 +75,8 @@ export function HomeScreen() {
       setTimeout(() => {
         setUploadStatus({ type: null, message: '' })
       }, 5000)
+      
+      // Keep pending session on error so user can retry
     } finally {
       setIsUploading(false)
       // Reset file input so the same file can be uploaded again if needed
@@ -77,7 +100,7 @@ export function HomeScreen() {
     setIsLoading(true)
     
     try {
-      // Check if server is available before creating a new chat
+      // Check if server is available before proceeding
       const isServerAvailable = await checkServerHealth()
       
       if (!isServerAvailable) {
@@ -86,15 +109,20 @@ export function HomeScreen() {
         return
       }
       
-      // Create a new chat session only if server is available
-      const newChat = createNewChat()
+      // Get or create pending chat session to ensure conversation_id consistency
+      // This reuses the same session if user uploaded a file first, or creates a new one
+      const chatId = getOrCreatePendingChat()
       
       // Navigate to chat page with message in URL params
       // The chat page will detect the message param and send it automatically
-      router.push(`/chat?chatId=${newChat.id}&message=${encodeURIComponent(messageContent)}`)
+      router.push(`/chat?chatId=${chatId}&message=${encodeURIComponent(messageContent)}`)
+      
+      // Clear pending session since we've navigated away
+      setPendingChatId(null)
     } catch (error) {
       setServerError("Unable to connect to the server. Please try again later.")
       setIsLoading(false)
+      // Keep pending session on error so user can retry
     }
   }
 
