@@ -4,7 +4,7 @@ Centralizes all configuration values used across the application.
 """
 
 # RAG pipeline configuration
-TOP_K = 4  # Number of documents to retrieve
+TOP_K = 5  # Number of documents to retrieve
 
 # Model configuration
 EMBEDDING_MODEL = "qwen3-embedding:0.6b"
