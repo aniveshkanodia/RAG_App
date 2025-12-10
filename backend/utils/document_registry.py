@@ -61,7 +61,9 @@ def get_supabase_client() -> Client:
         
         try:
             _supabase_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-            logger.info(f"Supabase client initialized for project: {SUPABASE_URL}")
+            # Mask URL in logs to avoid exposing project identifier
+            masked_url = f"{SUPABASE_URL[:20]}..." if SUPABASE_URL and len(SUPABASE_URL) > 20 else "***"
+            logger.info(f"Supabase client initialized for project: {masked_url}")
         except Exception as e:
             error_msg = f"Failed to initialize Supabase client: {str(e)}"
             logger.error(error_msg)

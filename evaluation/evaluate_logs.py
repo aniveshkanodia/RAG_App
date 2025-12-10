@@ -120,15 +120,12 @@ def evaluate_test_cases(test_cases: List[LLMTestCase]) -> Dict[str, List[float]]
     Returns:
         Dictionary mapping metric names to lists of scores
     """
-    # Initialize Ollama model once for reuse
+    # Initialize Ollama model once for reuse (model can be reused)
     ollama_model = OllamaModel(
         model=OLLAMA_MODEL,
         base_url=OLLAMA_BASE_URL,
         temperature=0
     )
-    
-    # Create metric instances once per metric type (reusable)
-    metrics = {cls.__name__: cls(model=ollama_model) for cls in METRIC_CLASSES}
     
     # Store scores for each metric
     metric_scores = defaultdict(list)
@@ -139,8 +136,12 @@ def evaluate_test_cases(test_cases: List[LLMTestCase]) -> Dict[str, List[float]]
         if (i + 1) % 10 == 0:
             print(f"  Processed {i + 1}/{len(test_cases)} test cases...")
         
-        for metric_name, metric in metrics.items():
+        # Create fresh metric instances for each test case to avoid state persistence
+        for metric_class in METRIC_CLASSES:
+            metric_name = metric_class.__name__
             try:
+                # Create a new metric instance for this test case
+                metric = metric_class(model=ollama_model)
                 metric.measure(test_case)
                 score = metric.score
                 if score is not None:

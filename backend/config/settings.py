@@ -18,7 +18,10 @@ API_PORT = int(os.getenv("API_PORT", "8000"))
 API_RELOAD = os.getenv("API_RELOAD", "true").lower() == "true"
 
 # CORS Configuration
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
+# SECURITY: Never use "*" in production - specify exact origins
+# Default to localhost for development, but require explicit setting for production
+_cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:3000")
+CORS_ORIGINS = _cors_origins_env.split(",") if _cors_origins_env else []
 CORS_CREDENTIALS = os.getenv("CORS_CREDENTIALS", "false").lower() == "true"
 
 # Logging Configuration

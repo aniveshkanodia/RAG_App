@@ -43,3 +43,11 @@ TestCases
 
 #log files
 logs/
+
+# macOS system files
+.DS_Store
+**/.DS_Store
+
+# Evaluation tool cache
+.deepeval/
+.deepeval_telemetry.txt

@@ -32,7 +32,7 @@ DEFAULT_GOLDENS_PATH = "TestNotebooks/synthetic_data/my_dataset.json"
 API_URL = "http://localhost:8000/api/chat"  # RAG API endpoint
 
 # Ollama configuration for evaluation
-OLLAMA_MODEL = "qwen3:0.6b"
+OLLAMA_MODEL = "deepseek-r1:1.5b"
 OLLAMA_BASE_URL = "http://localhost:11434"
 
 
@@ -82,8 +82,9 @@ def query_rag_api(question: str) -> tuple[str, List[str]]:
         answer = data.get("answer", "")
         
         # Extract retrieved context from sources
-        sources = data.get("sources", [])
-        retrieved_context = [s.get("content", "") for s in sources if s.get("content")]
+        # Handle case where sources might be None
+        sources = data.get("sources") or []
+        retrieved_context = [s.get("content", "") for s in sources if s and s.get("content")]
         
         return answer, retrieved_context
     except requests.exceptions.RequestException as e:
@@ -119,21 +120,21 @@ def evaluate_test_cases(test_cases: List[LLMTestCase]) -> Dict[str, List[float]]
     Returns:
         Dictionary mapping metric names to lists of scores
     """
-    # Initialize Ollama model once for reuse
+    # Initialize Ollama model once for reuse (model can be reused)
     ollama_model = OllamaModel(
         model=OLLAMA_MODEL,
         base_url=OLLAMA_BASE_URL,
         temperature=0
     )
     
-    # Create metric instances
-    metrics = {
-        "ContextualPrecisionMetric": ContextualPrecisionMetric(model=ollama_model),
-        "ContextualRecallMetric": ContextualRecallMetric(model=ollama_model),
-    }
-    
     # Store scores for each metric
     metric_scores = defaultdict(list)
+    
+    # Metric classes to evaluate
+    metric_classes = [
+        ("ContextualPrecisionMetric", ContextualPrecisionMetric),
+        ("ContextualRecallMetric", ContextualRecallMetric),
+    ]
     
     # Evaluate each test case with each metric
     print(f"Evaluating test cases using Ollama model: {OLLAMA_MODEL}...")
@@ -141,8 +142,11 @@ def evaluate_test_cases(test_cases: List[LLMTestCase]) -> Dict[str, List[float]]
         if (i + 1) % 5 == 0:
             print(f"  Processed {i + 1}/{len(test_cases)} test cases...")
         
-        for metric_name, metric in metrics.items():
+        # Create fresh metric instances for each test case to avoid state persistence
+        for metric_name, metric_class in metric_classes:
             try:
+                # Create a new metric instance for this test case
+                metric = metric_class(model=ollama_model)
                 metric.measure(test_case)
                 score = metric.score
                 if score is not None:

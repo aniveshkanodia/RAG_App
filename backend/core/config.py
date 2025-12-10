@@ -68,10 +68,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SUPABASE_PROJECT_ID = "tsadnlegfpcnnrrnxiam"
-
 # Supabase credentials must be provided via environment variables
-# Never hardcode authentication tokens in source code
+# Never hardcode authentication tokens, project IDs, or any sensitive data in source code
 # Validation is deferred to get_supabase_client() to allow graceful degradation
 # if Supabase is unavailable (the app can still function without the registry)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
