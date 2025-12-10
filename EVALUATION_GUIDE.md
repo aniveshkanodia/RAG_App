@@ -106,24 +106,9 @@ These metrics require ground truth (expected answers/context) and are used with 
 
 ## Evaluation Scripts
 
-The application includes three evaluation scripts:
+The application includes two evaluation scripts:
 
-### 1. `evaluation/run_offline_deepeval.py`
-
-**Purpose**: Comprehensive offline evaluation on conversation logs.
-
-**Metrics**: All 5 metrics (Faithfulness, Answer Relevancy, Contextual Relevancy, Contextual Precision, Contextual Recall)
-
-**Requirements**:
-- Conversation logs in `logs/rag_turns.jsonl`
-- Ollama running with evaluation model (`qwen3:0.6b`)
-
-**Features**:
-- Can filter by chunking strategy
-- Can limit number of records evaluated
-- Groups results by chunking strategy if multiple strategies present
-
-### 2. `evaluation/evaluate_logs.py`
+### 1. `evaluation/evaluate_logs.py`
 
 **Purpose**: Reference-free evaluation on conversation logs (no ground truth needed).
 
@@ -139,7 +124,7 @@ The application includes three evaluation scripts:
 - Can filter by chunking strategy
 - Can limit number of records
 
-### 3. `evaluation/evaluate_goldens.py`
+### 2. `evaluation/evaluate_goldens.py`
 
 **Purpose**: Reference-based evaluation using a golden dataset with expected answers.
 
@@ -177,19 +162,19 @@ Before running evaluations:
    source venv/bin/activate
    ```
 
-### Running Offline Log Evaluation
+### Running Reference-Free Log Evaluation
 
-Evaluate all conversation logs:
+Evaluate conversation logs using reference-free metrics (no ground truth required):
 
 ```bash
 cd /path/to/RAG_App
 source venv/bin/activate
-python evaluation/run_offline_deepeval.py
+python evaluation/evaluate_logs.py
 ```
 
 **Expected Output**:
 ```
-Starting offline DeepEval evaluation...
+Starting offline DeepEval evaluation (Reference-Free Metrics)...
 Using Ollama model: qwen3:0.6b
 Ollama base URL: http://localhost:11434
 Log path: logs/rag_turns.jsonl
@@ -222,14 +207,18 @@ FaithfulnessMetric:
   Min:    0.4321
   Max:    0.9876
 
-...
+ContextualRelevancyMetric:
+  Mean:   0.7567
+  StdDev: 0.1123
+  Min:    0.5432
+  Max:    0.9123
 ```
 
 **Filtering by Chunking Strategy**:
 
 Edit the script to filter by strategy:
 ```python
-# In evaluation/run_offline_deepeval.py
+# In evaluation/evaluate_logs.py
 FILTER_STRATEGY = "docling"  # or "recursive_text_splitter"
 ```
 
@@ -237,19 +226,9 @@ FILTER_STRATEGY = "docling"  # or "recursive_text_splitter"
 
 Edit the script to limit evaluation:
 ```python
-# In evaluation/run_offline_deepeval.py
+# In evaluation/evaluate_logs.py
 MAX_RECORDS = 10  # Only evaluate first 10 records
 ```
-
-### Running Reference-Free Log Evaluation
-
-Similar to offline evaluation but only uses reference-free metrics:
-
-```bash
-python evaluation/evaluate_logs.py
-```
-
-This script has the same configuration options (`FILTER_STRATEGY`, `MAX_RECORDS`).
 
 ### Running Golden Dataset Evaluation
 
@@ -401,7 +380,7 @@ This allows you to compare different chunking strategies and choose the best one
 Edit the evaluation scripts to use different Ollama models:
 
 ```python
-# In evaluation/run_offline_deepeval.py or evaluate_logs.py
+# In evaluation/evaluate_logs.py
 OLLAMA_MODEL = "qwen3:0.6b"  # Change to your preferred model
 OLLAMA_BASE_URL = "http://localhost:11434"
 ```
@@ -422,7 +401,7 @@ LOG_PATH = "logs/rag_turns.jsonl"  # Change to your log file path
 Or set via environment variable:
 ```bash
 export RAG_LOG_PATH="logs/custom_logs.jsonl"
-python evaluation/run_offline_deepeval.py
+python evaluation/evaluate_logs.py
 ```
 
 ### Changing API URL (Golden Evaluation)

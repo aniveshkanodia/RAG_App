@@ -160,19 +160,17 @@ The application includes comprehensive evaluation capabilities for assessing RAG
 
 ### Available Evaluation Scripts
 
-1. **Offline Log Evaluation** (`evaluation/run_offline_deepeval.py`):
+1. **Reference-Free Log Evaluation** (`evaluation/evaluate_logs.py`):
    - Evaluates conversation logs from `logs/rag_turns.jsonl`
    - Uses reference-free metrics (no ground truth required)
-   - Metrics: Answer Relevancy, Faithfulness, Contextual Relevancy, Contextual Precision, Contextual Recall
+   - Metrics: Answer Relevancy, Faithfulness, Contextual Relevancy
+   - Suitable for continuous monitoring of live usage logs
 
 2. **Golden Dataset Evaluation** (`evaluation/evaluate_goldens.py`):
    - Evaluates against a golden dataset with expected answers
    - Requires running RAG API server
    - Metrics: Contextual Precision, Contextual Recall
-
-3. **Reference-Free Log Evaluation** (`evaluation/evaluate_logs.py`):
-   - Similar to offline evaluation but only reference-free metrics
-   - Metrics: Answer Relevancy, Faithfulness, Contextual Relevancy
+   - Compares actual RAG responses to expected outputs
 
 For detailed evaluation instructions, see [EVALUATION_GUIDE.md](./EVALUATION_GUIDE.md).
 
@@ -227,9 +225,8 @@ RAG_App/
 │   ├── components/         # React components
 │   └── lib/                # Utilities and API client
 ├── evaluation/             # Evaluation scripts
-│   ├── evaluate_goldens.py      # Golden dataset evaluation
-│   ├── evaluate_logs.py         # Reference-free log evaluation
-│   └── run_offline_deepeval.py  # Full offline evaluation
+│   ├── evaluate_goldens.py      # Golden dataset evaluation (reference-based)
+│   └── evaluate_logs.py         # Reference-free log evaluation
 ├── scripts/                # Utility scripts
 │   └── clear_chroma_db.py  # Clear vector database
 ├── logs/                   # RAG conversation logs (JSONL format)
